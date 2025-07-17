@@ -1,0 +1,6 @@
+<h2>All Games</h2>
+<ul>
+  {% for game in games %}
+    <li>Week {{ game.week }}: {{ game.away_team }} at {{ game.home_team }} | Spread: {{ game.spread }} | Starts: {{ game.start_time }}</li>
+  {% endfor %}
+</ul>
