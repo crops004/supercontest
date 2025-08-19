@@ -1,6 +1,36 @@
-<h2>All Games</h2>
-<ul>
-  {% for game in games %}
-    <li>Week {{ game.week }}: {{ game.away_team }} at {{ game.home_team }} | Spread: {{ game.spread }} | Starts: {{ game.start_time }}</li>
-  {% endfor %}
-</ul>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Games</title>
+</head>
+<body>
+    <h1>Games</h1>
+
+    <table border="1" cellpadding="6">
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Away Team</th>
+                <th>Home Team</th>
+                <th>Spread</th>
+                <th>Start Time</th>
+
+            </tr>
+        </thead>
+        <tbody>
+            {% for game in games %}
+            <tr>
+                <td>{{ game.week }}</td>
+                <td>{{ game.away_team }}</td>
+                <td>{{ game.home_team }}</td>
+                <td>{{ game.spread }}</td>
+                <td>{{ game.start_time.strftime('%Y-%m-%d %I:%M %p') }}</td>
+
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p><a href="{{ url_for('main.home') }}">Back to Home</a></p>
+</body>
+</html>

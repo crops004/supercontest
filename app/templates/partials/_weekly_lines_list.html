@@ -1,0 +1,113 @@
+{% set disable = disable_inputs|default(false) %}
+{% if groups|length == 0 %}
+  <p>No games for this week.</p>
+{% else %}
+  {% for day_title, times in groups %}
+    <h2 style="margin:1rem 0 .25rem; font-weight:700;">{{ day_title }}</h2>
+
+    {% for time_title, items in times %}
+      <h3 style="margin:.25rem 0 .25rem; font-weight:600;">{{ time_title }}</h3>
+
+      {% for g in items %}
+        {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+        {% set has_final = (g.final_score_home is not none and g.final_score_away is not none) %}
+        {% set chosen = picks_by_game.get(g.id) %}
+        {% set already = (chosen is not none) %}
+
+        {# --- compute ATS result classes (win/lose/push) for each team --- #}
+        {% if has_final %}
+          {% set away_spread = g.spread_away or 0 %}
+          {% set home_spread = g.spread_home or 0 %}
+          {# Adjusted scores vs opponent raw score #}
+          {% set away_adj = g.final_score_away + away_spread %}
+          {% set home_adj = g.final_score_home + home_spread %}
+
+          {% if away_adj > g.final_score_home %}
+            {% set away_cls = 'win' %}
+          {% elif away_adj == g.final_score_home %}
+            {% set away_cls = 'push' %}
+          {% else %}
+            {% set away_cls = 'lose' %}
+          {% endif %}
+
+          {% if home_adj > g.final_score_away %}
+            {% set home_cls = 'win' %}
+          {% elif home_adj == g.final_score_away %}
+            {% set home_cls = 'push' %}
+          {% else %}
+            {% set home_cls = 'lose' %}
+          {% endif %}
+        {% endif %}
+
+        <div class="game" style="padding:.6rem 0; border-top:1px solid #ddd;">
+
+          <!-- Away (top) -->
+          <div class="row" style="display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
+            <label style="display:flex; gap:.5rem; align-items:center; flex:1;">
+              {% if current_user.is_authenticated and not disable %}
+                <input
+                  class="pick-box"
+                  type="checkbox"
+                  name="picks"
+                  value="{{ g.id }}|{{ g.away_team }}"
+                  data-game="{{ g.id }}"
+                  data-already-picked="{{ 1 if already else 0 }}"
+                  {% if locked %}disabled{% endif %}
+                  {% if chosen == g.away_team %}checked{% endif %}
+                />
+              {% endif %}
+              <span class="team">
+                {{ g.away_team }}
+                {% if g.final_score_away is not none %}
+                  {% set r = ats_by_game.get((g.id, g.away_team)) %}
+                  {% set cls = 'score-badge ' + ('score-win' if r=='COVER' else 'score-push' if r=='PUSH' else 'score-lose' if r=='NO_COVER' else '') %}
+                  <span class="{{ cls }}">{{ g.final_score_away }}</span>
+                {% endif %}
+              </span>
+            </label>
+            <div class="line" style="min-width:2.5rem; text-align:right;">
+              {% if is_pickem(g) %}
+                PK
+              {% elif g.spread_away is not none and g.spread_away < 0 %}
+                {{ g.spread_away|fmt_spread }}
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Home (bottom) -->
+          <div class="row" style="display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
+            <label style="display:flex; gap:.5rem; align-items:center; flex:1;">
+              {% if current_user.is_authenticated and not disable %}
+                <input
+                  class="pick-box"
+                  type="checkbox"
+                  name="picks"
+                  value="{{ g.id }}|{{ g.home_team }}"
+                  data-game="{{ g.id }}"
+                  data-already-picked="{{ 1 if already else 0 }}"
+                  {% if locked %}disabled{% endif %}
+                  {% if chosen == g.home_team %}checked{% endif %}
+                />
+              {% endif %}
+              <span class="team">
+                {{ g.home_team }}
+                {% if g.final_score_home is not none %}
+                  {% set r = ats_by_game.get((g.id, g.home_team)) %}
+                  {% set cls = 'score-badge ' + ('score-win' if r=='COVER' else 'score-push' if r=='PUSH' else 'score-lose' if r=='NO_COVER' else '') %}
+                  <span class="{{ cls }}">{{ g.final_score_home }}</span>
+                {% endif %}
+              </span>
+            </label>
+            <div class="line" style="min-width:2.5rem; text-align:right;">
+              {% if is_pickem(g) %}
+                PK
+              {% elif g.spread_home is not none and g.spread_home < 0 %}
+                {{ g.spread_home|fmt_spread }}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+  {% endfor %}
+{% endif %}

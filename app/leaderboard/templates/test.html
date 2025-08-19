@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto p-4">
+
+  <!-- Header with week & arrows -->
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      {% if show_left %}
+        <a class="px-3 py-1 rounded border hover:bg-gray-100"
+           href="{{ url_for('leaderboard.leaderboard', week=display_week-1) }}"
+           aria-label="Previous week">←</a>
+      {% endif %}
+
+      <h2 class="text-xl font-semibold">Week {{ display_week }}</h2>
+
+      {% if show_right %}
+        <a class="px-3 py-1 rounded border hover:bg-gray-100"
+           href="{{ url_for('leaderboard.leaderboard', week=display_week+1) }}"
+           aria-label="Next week">→</a>
+      {% endif %}
+    </div>
+    <div class="text-sm text-gray-500">Current week: {{ current_week }}</div>
+  </div>
+
+  {% set pick_class = {
+    'win':     'bg-green-100 text-green-800 font-medium',
+    'loss':    'bg-red-100 text-red-800 font-medium',
+    'push':    'bg-yellow-100 text-yellow-900 font-medium',
+    'pending': 'bg-gray-100 text-gray-600',
+    'hidden':  'text-gray-400',
+    'empty':   'text-gray-300'
+  } %}
+
+  <div class="overflow-x-auto rounded-xl border">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr class="text-left">
+          <th class="py-3 pl-4 pr-4 font-semibold">Player</th>
+          <th class="py-3 pr-4 font-semibold" colspan="5">Picks (Week {{ display_week }})</th>
+          <th class="py-3 pr-4 font-semibold text-center" colspan="3">This Week (W‑L‑P)</th>
+          <th class="py-3 pr-4 font-semibold text-center" colspan="3">Overall (W‑L‑P)</th>
+          <th class="py-3 pr-4 font-semibold text-right">Pts</th>
+        </tr>
+        <tr class="text-left text-xs text-gray-500 border-t">
+          <th class="py-2 pl-4 pr-4"></th>
+          <th class="py-2 pr-4">Pick 1</th>
+          <th class="py-2 pr-4">Pick 2</th>
+          <th class="py-2 pr-4">Pick 3</th>
+          <th class="py-2 pr-4">Pick 4</th>
+          <th class="py-2 pr-4">Pick 5</th>
+          <th class="py-2 pr-4 text-center">W</th>
+          <th class="py-2 pr-4 text-center">L</th>
+          <th class="py-2 pr-4 text-center">P</th>
+          <th class="py-2 pr-4 text-center">W</th>
+          <th class="py-2 pr-4 text-center">L</th>
+          <th class="py-2 pr-4 text-center">P</th>
+          <th class="py-2 pr-4 text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for r in rows %}
+        <tr class="hover:bg-gray-50">
+          <td class="py-3 pl-4 pr-4 font-medium whitespace-nowrap">
+            {{ r.full_name or r.username }}
+          </td>
+
+          {# 5 color-coded pick cells #}
+          {% for p in r.weekly_picks %}
+            <td class="py-3 pr-4">
+              {% if p.label %}
+                <span class="inline-block px-2 py-1 rounded {{ pick_class.get(p.status, '') }}">
+                  {{ p.label|team_short }}
+                </span>
+              {% else %}
+                <span class="{{ pick_class.get(p.status, '') }}">—</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+
+          {% set w, l, psh = r.week_WLP %}
+          <td class="py-3 pr-4 text-center font-medium text-green-700">{{ w }}</td>
+          <td class="py-3 pr-4 text-center font-medium text-red-700">{{ l }}</td>
+          <td class="py-3 pr-4 text-center font-medium text-yellow-700">{{ psh }}</td>
+
+          {% set sw, sl, sp = r.season_WLP %}
+          <td class="py-3 pr-4 text-center font-medium text-green-700">{{ sw }}</td>
+          <td class="py-3 pr-4 text-center font-medium text-red-700">{{ sl }}</td>
+          <td class="py-3 pr-4 text-center font-medium text-yellow-700">{{ sp }}</td>
+
+          <td class="py-3 pr-4 text-right font-semibold">{{ "%.1f"|format(r.points) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}
