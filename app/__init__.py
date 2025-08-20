@@ -1,11 +1,13 @@
 from flask import Flask
-from config import Config
+from config import get_config
 from datetime import datetime
 from app.extensions import db, migrate, login_manager
+import logging
+import sys
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(get_config())
 
     # dev-only niceties
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -50,4 +52,11 @@ def create_app():
         from .models import User
         return User.query.get(int(user_id))
 
+    # --- Logging setup ---
+    if not app.debug:  # only tweak for production
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.INFO)
+        app.logger.setLevel(logging.INFO)
+        app.logger.addHandler(handler)
+        
     return app

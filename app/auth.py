@@ -57,11 +57,11 @@ def login():
 
         user = User.query.filter_by(username=username).first()
         if not user or not user.check_password(password):
-            flash("Invalid username or password.")
+            flash("Invalid username or password.", 'auth_error')
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=remember)
-        flash("Logged in!")
+        flash("Logged in!", 'auth_success')
         next_url = request.args.get('next') or url_for('main.home')
         return redirect(next_url)
 
@@ -72,5 +72,5 @@ def login():
 @login_required
 def logout():
     logout_user()
-    flash("Logged out.")
+    flash("Logged out.", 'auth_info')
     return redirect(url_for('main.home'))
