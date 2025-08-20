@@ -58,5 +58,10 @@ def create_app():
         handler.setLevel(logging.INFO)
         app.logger.setLevel(logging.INFO)
         app.logger.addHandler(handler)
-        
+
+    # ✅ Health check route (safe, no DB/auth required)
+    @app.get("/healthz")
+    def healthz():
+        return "ok", 200
+
     return app
