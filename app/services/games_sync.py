@@ -185,25 +185,32 @@ def import_all_scores(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS, days_
 # -------------------------------------------------------------------
 #  Lock weeks (this week and all previous)
 # -------------------------------------------------------------------
-def lock_weeks_through_current() -> Dict[str, int]:
+def lock_weeks_through_current(*, include_preseason: bool = True) -> dict:
     """
     Based on Tuesday-anchored week, lock spreads for all games with week <= current week.
     """
     wk_now = current_week_number()
-    if wk_now <= 0:
-        # Before Week 1 – nothing to lock (or adjust if you want preseason locked)
+    # Only bail if we’re literally before preseason
+    if wk_now < 0:
         return {"locked": 0, "week_now": wk_now}
 
+    min_week = 0 if include_preseason else 1
+
     q = Game.query.filter(
-        and_(Game.week <= wk_now, Game.spread_is_locked == False)  # noqa: E712
+        Game.week.between(min_week, wk_now),
+        (Game.spread_is_locked.is_(False) | Game.spread_is_locked.is_(None))
     )
+
     count = 0
+    from datetime import datetime, timezone
     for g in q:
         g.spread_is_locked = True
+        if hasattr(g, "spread_locked_at"):
+            g.spread_locked_at = datetime.now(timezone.utc)
         count += 1
 
     db.session.commit()
-    return {"locked": count, "week_now": wk_now}
+    return {"locked": count, "week_now": wk_now, "min_week": min_week}
 
 
 # -------------------------------------------------------------------
