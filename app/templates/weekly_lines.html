@@ -80,7 +80,9 @@
   const hiddenTz  = document.getElementById('tz-hidden');
   const formEl    = document.getElementById('picks-form');
 
-  const userTZ = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  // Robust TZ detection with a fallback (pick a sensible default for your app)
+  const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
 
   function getWeekOptions() {
     return Array.from(weekEl.options).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
@@ -164,6 +166,13 @@
 
   async function loadWeek(w) {
     statusEl.textContent = 'Loading…';
+
+    const base = "{{ url_for('main.weekly_lines_fragment') }}";
+    const params = new URLSearchParams({ week: String(w), tz: userTZ });
+    const url = `${base}?${params.toString()}`;
+    console.log('[weekly] userTZ =', userTZ);
+    console.log('[weekly] GET', url);
+
     try {
       const url = "{{ url_for('main.weekly_lines_fragment') }}" +
                   "?week=" + encodeURIComponent(w) +
@@ -171,8 +180,10 @@
       const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
       const body = await res.text();
       if (!res.ok) {
-        statusEl.textContent = body || ('Failed to load week ' + w);
         console.error('Fragment error:', res.status, body);
+        statusEl.textContent = 'Failed to load week ' + w + '.';
+        // Optional: show a friendly placeholder instead of raw error HTML
+        gamesEl.innerHTML = '<p class="muted">Sorry, couldn’t load games.</p>';
         return;
       }
       gamesEl.innerHTML = body;
@@ -227,6 +238,13 @@
   attachPickHandlers();
   updatePagerDisabled();
   updatePickCountUI();
+
+  // One-time refresh with browser TZ if the initial page URL lacks ?tz=...
+  const qs = new URLSearchParams(window.location.search);
+  if (!qs.has('tz')) {
+    setTimeout(() => loadWeek(weekEl.value), 0);
+  }
+
 </script>
 {% endblock %}
 

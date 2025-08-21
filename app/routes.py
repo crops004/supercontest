@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from app.scoring import points_for_pick, game_result_against_spread
+from app.services.time_utils import day_key, time_key
 from typing import Dict, List, cast
 from app.types import AggRow
 from datetime import datetime, timezone, timedelta
@@ -44,40 +45,6 @@ def _week_from_thursday(dt: datetime, anchor: datetime) -> int:
 def _current_week_number() -> int:
     return _week_from_thursday(datetime.now(timezone.utc), _thursday_anchor_utc())
 
-# --- display timezone helpers ---
-try:
-    from zoneinfo import ZoneInfo  # py3.9+
-except Exception:
-    ZoneInfo = None
-
-def _to_display_tz(dt: datetime, tzname: str | None) -> datetime:
-    """Convert a datetime to the requested tz (IANA name), else leave tz / assume UTC."""
-    if tzname and ZoneInfo:
-        try:
-            return dt.astimezone(ZoneInfo(tzname))
-        except Exception:
-            pass
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-
-def _fmt_time_short(d: datetime) -> str:
-    # Cross-platform (no %-I): strip leading zero from %I manually.
-    h = d.strftime('%I').lstrip('0') or '0'
-    m = d.strftime('%M')
-    ap = d.strftime('%p')
-    tzabbr = d.strftime('%Z')
-    return f"{h}:{m} {ap} {tzabbr}"  # e.g., 6:15 PM MST
-
-def _day_key(dt: datetime | None, tzname: str | None):
-    if dt is None:
-        return ("TBD", None)
-    d = _to_display_tz(dt, tzname)
-    return (d.strftime("%A"), d.date())  # title, sort key
-
-def _time_key(dt: datetime | None, tzname: str | None):
-    if dt is None:
-        return ("TBD", None)
-    d = _to_display_tz(dt, tzname)
-    return (_fmt_time_short(d), d.strftime("%H:%M"))  # title, chrono sort key
 
 # --- helpers for weekly-lines visibility ---
 def visible_weeks():
@@ -157,11 +124,11 @@ def weekly_lines():
     # ---- your existing grouping logic (unchanged) ----
     days: "OrderedDict[tuple, dict]" = OrderedDict()
     for g in games:
-        day_title, day_sort = _day_key(g.kickoff_at, tzname)
+        day_title, day_sort = day_key(g.kickoff_at, tzname)
         if (day_title, day_sort) not in days:
             days[(day_title, day_sort)] = OrderedDict()
         times = days[(day_title, day_sort)]
-        time_title, time_sort = _time_key(g.kickoff_at, tzname)
+        time_title, time_sort = time_key(g.kickoff_at, tzname)
         if (time_title, time_sort) not in times:
             times[(time_title, time_sort)] = []
         times[(time_title, time_sort)].append(g)
@@ -200,8 +167,9 @@ def weekly_lines():
 @bp.route("/lines/fragment")
 def weekly_lines_fragment():
     selected_week = request.args.get("week", type=int)
+    tzname = request.args.get("tz")
+
     if selected_week is None:
-        # fall back to latest locked week
         row = (db.session.query(Game.week)
                .filter(Game.spread_is_locked.is_(True))
                .order_by(Game.week.desc())
@@ -214,24 +182,31 @@ def weekly_lines_fragment():
                 "partials/_weekly_lines_list.html",
                 groups=[],
                 picks_by_game={},
+                selected_week=selected_week,
                 now_utc=datetime.now(timezone.utc),
+                tzname=tzname,   # ✅ pass tz even here
+                ats_by_game={},                  # ✅ safe default
             )
-
-    tzname = request.args.get("tz")
 
     # Only show locked games in the requested week
     games = (Game.query
-                  .filter(Game.week == selected_week,
-                          Game.spread_is_locked.is_(True))
-                  .order_by(Game.kickoff_at.asc(), Game.id.asc())
-                  .all())
+                .filter(Game.week == selected_week,
+                        Game.spread_is_locked.is_(True))
+                .order_by(Game.kickoff_at.asc(), Game.id.asc())
+                .all())
 
-    # Group by day/time (same as before)
+    # ✅ Build ats_by_game just like admin
+    game_ids = [g.id for g in games]
+    ats_rows = (TeamGameATS.query
+                .filter(TeamGameATS.game_id.in_(game_ids)).all()) if game_ids else []
+    ats_by_game = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows}
+
+    # Group by day/time
     days: "OrderedDict[tuple, dict]" = OrderedDict()
     for g in games:
-        day_title, day_sort = _day_key(g.kickoff_at, tzname)
+        day_title, day_sort = day_key(g.kickoff_at, tzname)
         times = days.setdefault((day_title, day_sort), OrderedDict())
-        time_title, time_sort = _time_key(g.kickoff_at, tzname)
+        time_title, time_sort = time_key(g.kickoff_at, tzname)
         times.setdefault((time_title, time_sort), []).append(g)
 
     groups = []
@@ -240,14 +215,14 @@ def weekly_lines_fragment():
 
     now_utc = datetime.now(timezone.utc)
 
-    # Current user's picks for this (locked) week, to pre-check and disable after kickoff
+    # Current user's picks (for pre-check)
     picks_by_game = {}
     if current_user.is_authenticated:
         picked = (db.session.query(Pick)
-                  .join(Game, Game.id == Pick.game_id)
-                  .filter(Pick.user_id == current_user.id,
-                          Game.week == selected_week)
-                  .all())
+                    .join(Game, Game.id == Pick.game_id)
+                    .filter(Pick.user_id == current_user.id,
+                            Game.week == selected_week)
+                    .all())
         for p in picked:
             picks_by_game[p.game_id] = p.chosen_team
 
@@ -257,7 +232,8 @@ def weekly_lines_fragment():
         picks_by_game=picks_by_game,
         now_utc=now_utc,
         selected_week=selected_week,
-        tzname=tzname,
+        tzname=tzname,           # ✅ pass tz
+        ats_by_game=ats_by_game, # ✅ pass ats map
     )
 
 @bp.route("/lines/submit", methods=["POST"])

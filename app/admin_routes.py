@@ -10,7 +10,7 @@ from typing import List, Dict
 from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
-from .routes import _day_key, _time_key
+from app.services.time_utils import day_key, time_key
 
 # New, simplified services
 from app.services.games_sync import (
@@ -244,9 +244,9 @@ def admin_lines_fragment():
     # group by day/time (same as your public fragment)
     days: "OrderedDict[tuple, dict]" = OrderedDict()
     for g in games:
-        day_title, day_sort = _day_key(g.kickoff_at, tzname)
+        day_title, day_sort = day_key(g.kickoff_at, tzname)
         times = days.setdefault((day_title, day_sort), OrderedDict())
-        time_title, time_sort = _time_key(g.kickoff_at, tzname)
+        time_title, time_sort = time_key(g.kickoff_at, tzname)
         times.setdefault((time_title, time_sort), []).append(g)
 
     groups = []
@@ -261,4 +261,5 @@ def admin_lines_fragment():
         now_utc=datetime.now(timezone.utc),
         disable_inputs=True,               # ⬅️ tells the partial to hide inputs
         ats_by_game=ats_by_game,
+        tzname=tzname,                     
     )

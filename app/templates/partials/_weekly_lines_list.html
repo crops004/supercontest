@@ -1,3 +1,5 @@
+{% set ats_by_game = ats_by_game|default({}) %}
+<!-- tz={{ tzname or 'None' }} -->
 {% set disable = disable_inputs|default(false) %}
 {% if groups|length == 0 %}
   <p>No games for this week.</p>
@@ -68,7 +70,7 @@
             <div class="line" style="min-width:2.5rem; text-align:right;">
               {% if is_pickem(g) %}
                 PK
-              {% elif g.spread_away is not none and g.spread_away < 0 %}
+              {% else %}
                 {{ g.spread_away|fmt_spread }}
               {% endif %}
             </div>
@@ -101,7 +103,7 @@
             <div class="line" style="min-width:2.5rem; text-align:right;">
               {% if is_pickem(g) %}
                 PK
-              {% elif g.spread_home is not none and g.spread_home < 0 %}
+              {% else %}
                 {{ g.spread_home|fmt_spread }}
               {% endif %}
             </div>
