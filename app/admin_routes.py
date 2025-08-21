@@ -6,7 +6,7 @@ from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
 from app.services.odds_client import fetch_odds, fetch_scores
 from app.services.games_sync import upsert_game_from_odds_event, update_game_scores_from_score_event
-from app.services.lines_cycle import refresh_regular_lines, lock_current_week
+from app.services.lines_cycle import lock_current_week, refresh_lines_for_key
 from .routes import _day_key, _time_key
 from collections import defaultdict
 from typing import List, Dict
@@ -82,18 +82,25 @@ def _update_scores_recent_for_key(sport_key: str, *, days_from: int = 3) -> tupl
 @login_required
 def admin_refresh_lines():
     keys = _sport_keys()
-    created, updated = _refresh_lines_for_key(keys["regular"], force_week=None)
-    flash(f"Regular-season lines refreshed: created={created}, updated={updated}.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+    res = refresh_lines_for_key(keys["regular"], force_week=None)  # auto-compute week
+    flash(
+        f"Regular-season lines refreshed for week {res['week']}: "
+        f"created={res['created']}, updated={res['updated']}.",
+        "success",
+    )
+    return redirect(url_for("admin.admin_panel", week=res["week"]))
 
 @admin_bp.route("/refresh_lines_preseason", methods=["POST"])
 @login_required
 def admin_refresh_lines_preseason():
     keys = _sport_keys()
-    # Preseason games are stored as week 0
-    created, updated = _refresh_lines_for_key(keys["preseason"], force_week=0)
-    flash(f"Preseason lines refreshed (week 0): created={created}, updated={updated}.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+    # Preseason always stored as week 0
+    res = refresh_lines_for_key(keys["preseason"], force_week=0)
+    flash(
+        f"Preseason lines refreshed (week 0): created={res['created']}, updated={res['updated']}.",
+        "success",
+    )
+    return redirect(url_for("admin.admin_panel", week=0))
 
 
 # ---------- SCORES (POST buttons) ----------
@@ -114,6 +121,25 @@ def admin_update_scores_preseason():
     flash(f"Preseason scores updated (last 3 days). Changed: {changed}. ATS finalized: {finalized}.", "success")
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
+@admin_bp.route("/lock_current_week", methods=["POST"])
+@login_required
+def admin_lock_current_week():
+    wk = request.args.get('week', type=int)  # respects the UI selection
+    season_type = "preseason" if wk == 0 else "regular"
+    res = lock_current_week(week=wk, season_type=season_type)
+
+    if res.get('locked_week') is not None:
+        locked_games = Game.query.filter_by(week=res['locked_week'], spread_is_locked=True).all()
+        for g in locked_games:
+            snapshot_closing_lines_for_game(g, line_source="Admin/Lock")
+        db.session.commit()
+
+    flash(
+        f"Locked week {res.get('locked_week')} — games locked={res.get('games_locked')}. "
+        f"Closing lines snapshotted.",
+        "success",
+    )
+    return redirect(url_for("admin.admin_panel", week=res.get('locked_week')))
 
 @admin_bp.route("/panel", methods=["GET"])
 @login_required
@@ -229,21 +255,6 @@ def admin_panel():
         ats_summary=ats_summary,
     )
 
-
-@admin_bp.route("/lock_current_week", methods=["POST"])
-@login_required
-def admin_lock_current_week():
-    res = lock_current_week()
-    # Snapshot closing spreads for all now-locked games in that week
-    wk = res.get('locked_week')
-    if wk is not None:
-        locked_games = Game.query.filter_by(week=wk, spread_is_locked=True).all()
-        for g in locked_games:
-            snapshot_closing_lines_for_game(g, line_source="Admin/Lock")
-        db.session.commit()
-
-    flash(f"Locked week {res.get('locked_week')} — games locked={res.get('games_locked')}. Closing lines snapshotted.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get('week', type=int)))
 
 
 

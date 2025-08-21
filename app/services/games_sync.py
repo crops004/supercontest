@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.extensions import db
 from app.models import Game
 from app.services.odds_client import parse_iso_z
+from app.services.week_utils import week_from_thursday
 
 def _is_locked(game: Game) -> bool:
     return bool(getattr(game, "spread_is_locked", False))
@@ -30,7 +31,8 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     away = event["away_team"]
 
     game = Game.query.filter_by(odds_event_id=ext_id).one_or_none()
-    if not game:
+    is_new = game is None
+    if is_new:
         game = Game()
         game.odds_event_id = ext_id
 
@@ -38,9 +40,12 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     game.away_team = away
     game.kickoff_at = kickoff_at
     if hasattr(game, "start_time"):
-        game.start_time = kickoff_at  # keep legacy in sync (aware UTC)
+        game.start_time = kickoff_at
 
-    game.week = force_week if force_week is not None else (game.week or 0)
+    # --- week handling ---
+    if force_week is not None:
+        game.week = force_week
+    # else: don’t derive here — caller (refresh_lines_for_key) decides the week bucket
 
     if not _is_locked(game):
         home_spread = _extract_home_spread_from_event(event)

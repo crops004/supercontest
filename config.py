@@ -41,7 +41,13 @@ class BaseConfig:
 
     # Optional: example of reading your custom timestamp if you need it in code
     NFL_WEEK1_THURSDAY_UTC = os.environ.get("NFL_WEEK1_THURSDAY_UTC")
-
+    
+    # NFL sport keys (used by lock/refresh code)
+    SPORT_KEYS = {
+        "regular": "americanfootball_nfl",
+        "preseason": "americanfootball_nfl_preseason",
+    }
+    
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
     # If no DB URL provided locally, fall back to a SQLite file so the app still boots
