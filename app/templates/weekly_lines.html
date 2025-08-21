@@ -103,19 +103,17 @@
   }
 
   function computeFixedPicked() {
-    // Count unique games where either checkbox has data-already-picked="1"
-    const fixedBoxes = qAll('input.pick-box[data-already-picked="1"]');
-    const gameIds = new Set(fixedBoxes.map(b => b.getAttribute('data-game')));
+    // Count unique games where a previously-saved pick is STILL checked
+    const fixedChecked = qAll('input.pick-box[data-already-picked="1"]:checked');
+    const gameIds = new Set(fixedChecked.map(b => b.getAttribute('data-game')));
     return gameIds.size;
   }
 
   function computeDynamicChecked() {
-    // Count unique games where a non-fixed checkbox is checked and not disabled
-    const boxes = qAll('input.pick-box[type="checkbox"][data-already-picked="0"]');
-    const checkedGameIds = new Set(
-      boxes.filter(b => b.checked && !b.disabled).map(b => b.getAttribute('data-game'))
-    );
-    return checkedGameIds.size;
+    // Count unique games picked this session (not previously saved), ignoring disabled
+    const dynChecked = qAll('input.pick-box[data-already-picked="0"]:checked:not(:disabled)');
+    const gameIds = new Set(dynChecked.map(b => b.getAttribute('data-game')));
+    return gameIds.size;
   }
 
   function totalSelected() {

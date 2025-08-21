@@ -51,7 +51,7 @@
                   name="picks"
                   value="{{ g.id }}|{{ g.away_team }}"
                   data-game="{{ g.id }}"
-                  data-already-picked="{{ 1 if already else 0 }}"
+                  data-already-picked="{{ 1 if chosen == g.away_team else 0 }}"
                   {% if locked %}disabled{% endif %}
                   {% if chosen == g.away_team %}checked{% endif %}
                 />
@@ -84,7 +84,7 @@
                   name="picks"
                   value="{{ g.id }}|{{ g.home_team }}"
                   data-game="{{ g.id }}"
-                  data-already-picked="{{ 1 if already else 0 }}"
+                  data-already-picked="{{ 1 if chosen == g.home_team else 0 }}"
                   {% if locked %}disabled{% endif %}
                   {% if chosen == g.home_team %}checked{% endif %}
                 />
