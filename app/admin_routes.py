@@ -1,170 +1,135 @@
 # app/admin_routes.py
+from __future__ import annotations
+
 from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
+from datetime import datetime, timezone
+from collections import defaultdict, OrderedDict
+from typing import List, Dict
+
 from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
-from app.services.odds_client import fetch_odds, fetch_scores
-from app.services.games_sync import upsert_game_from_odds_event, update_game_scores_from_score_event
-from app.services.lines_cycle import lock_current_week, refresh_lines_for_key
 from .routes import _day_key, _time_key
-from collections import defaultdict
-from typing import List, Dict
-from datetime import datetime, timezone
-from collections import OrderedDict
+
+# New, simplified services
+from app.services.games_sync import (
+    import_all_lines,
+    import_all_scores,
+    lock_weeks_through_current,
+    refresh_spreads_unlocked,
+)
+from app.services.week import current_week_number
 from app.services.ats import snapshot_closing_lines_for_game, finalize_ats_for_game
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
-# ---------- small helpers (DRY) ----------
+# ---------- LINES & SCORES (POST buttons) ----------
 
-# Defaults if not overridden in app.config["SPORT_KEYS"]
-DEFAULT_SPORT_KEYS = {
-    "regular": "americanfootball_nfl",
-    "preseason": "americanfootball_nfl_preseason",
-}
-
-def _sport_keys() -> dict:
-    """Merge defaults with any overrides from app config."""
-    cfg = current_app.config.get("SPORT_KEYS") or {}
-    return {**DEFAULT_SPORT_KEYS, **cfg}
-
-
-def _refresh_lines_for_key(sport_key: str, *, force_week: int | None) -> tuple[int, int]:
-    """
-    Fetch odds for a sport key and upsert games.
-    Returns (created_count, updated_count).
-    """
-    events = fetch_odds(sport_key)
-    created = updated = 0
-    for ev in events or []:
-        existed = Game.query.filter_by(odds_event_id=ev.get("id")).one_or_none() is not None
-        upsert_game_from_odds_event(ev, force_week=force_week)
-        if existed:
-            updated += 1
-        else:
-            created += 1
-    db.session.commit()
-    return created, updated
-
-
-def _update_scores_recent_for_key(sport_key: str, *, days_from: int = 3) -> tuple[int, int]:
-    """
-    Fetch recent scores (daysFrom = 1..3) and update matching games.
-    Returns number of games that changed scores.
-    """
-    score_events = fetch_scores(sport_key, days_from=days_from)  # your client already supports days_from
-    by_id = {ev.get("id"): ev for ev in (score_events or []) if ev.get("id")}
-    if not by_id:
-        return 0, 0
-
-    changed = finalized = 0
-    games = Game.query.filter(Game.odds_event_id.in_(list(by_id.keys()))).all()
-    for g in games:
-        before = (g.final_score_home, g.final_score_away)
-        update_game_scores_from_score_event(g, by_id[g.odds_event_id])
-        after = (g.final_score_home, g.final_score_away)
-        if before != after:
-            changed += 1
-        # Finalize ATS whenever both scores are present (idempotent/safe)
-        if after[0] is not None and after[1] is not None:
-            finalize_ats_for_game(g)
-            finalized += 1
-
-    db.session.commit()
-    return changed, finalized
-
-
-# ---------- LINES (POST buttons) ----------
-
-@admin_bp.route("/refresh_lines", methods=["POST"])
+@admin_bp.route("/import-lines", methods=["POST"])
 @login_required
-def admin_refresh_lines():
-    keys = _sport_keys()
-    res = refresh_lines_for_key(keys["regular"], force_week=None)  # auto-compute week
+def admin_import_lines():
+    res = import_all_lines()
     flash(
-        f"Regular-season lines refreshed for week {res['week']}: "
-        f"created={res['created']}, updated={res['updated']}.",
+        f"Lines imported: created={res['created']}, updated={res['updated']}, skipped_locked={res['skipped_locked']}.",
         "success",
     )
-    return redirect(url_for("admin.admin_panel", week=res["week"]))
+    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
-@admin_bp.route("/refresh_lines_preseason", methods=["POST"])
+
+@admin_bp.route("/import-scores", methods=["POST"])
 @login_required
-def admin_refresh_lines_preseason():
-    keys = _sport_keys()
-    # Preseason always stored as week 0
-    res = refresh_lines_for_key(keys["preseason"], force_week=0)
+def admin_import_scores():
+    # Optional ?days_from=1..3 (defaults to 3)
+    days_from = request.args.get("days_from", type=int) or 3
+    res = import_all_scores(days_from=days_from)
     flash(
-        f"Preseason lines refreshed (week 0): created={res['created']}, updated={res['updated']}.",
+        f"Scores updated (daysFrom={days_from}): updated={res['updated_scores']}, "
+        f"unchanged={res['unchanged']}, missing_game={res['missing_game']}.",
         "success",
     )
-    return redirect(url_for("admin.admin_panel", week=0))
-
-
-# ---------- SCORES (POST buttons) ----------
-
-@admin_bp.route("/update_scores_regular", methods=["POST"])
-@login_required
-def admin_update_scores_regular():
-    keys = _sport_keys()
-    changed, finalized = _update_scores_recent_for_key(keys["regular"], days_from=3)
-    flash(f"Regular-season scores updated (last 3 days). Changed: {changed}. ATS finalized: {finalized}.", "success")
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
-@admin_bp.route("/update_scores_preseason", methods=["POST"])
-@login_required
-def admin_update_scores_preseason():
-    keys = _sport_keys()
-    changed, finalized = _update_scores_recent_for_key(keys["preseason"], days_from=3)
-    flash(f"Preseason scores updated (last 3 days). Changed: {changed}. ATS finalized: {finalized}.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
-@admin_bp.route("/lock_current_week", methods=["POST"])
+@admin_bp.route("/lock-weeks", methods=["POST"])
 @login_required
-def admin_lock_current_week():
-    wk = request.args.get('week', type=int)  # respects the UI selection
-    season_type = "preseason" if wk == 0 else "regular"
-    res = lock_current_week(week=wk, season_type=season_type)
+def admin_lock_weeks():
+    res = lock_weeks_through_current()
 
-    if res.get('locked_week') is not None:
-        locked_games = Game.query.filter_by(week=res['locked_week'], spread_is_locked=True).all()
-        for g in locked_games:
-            snapshot_closing_lines_for_game(g, line_source="Admin/Lock")
-        db.session.commit()
+    # Optionally snapshot closing lines for all locked games after locking
+    locked_games = Game.query.filter_by(spread_is_locked=True).all()
+    for g in locked_games:
+        snapshot_closing_lines_for_game(g, line_source="Admin/Lock")
+    db.session.commit()
 
     flash(
-        f"Locked week {res.get('locked_week')} — games locked={res.get('games_locked')}. "
+        f"Weeks locked through {res['week_now']}. Newly locked games={res['locked']}. "
         f"Closing lines snapshotted.",
         "success",
     )
-    return redirect(url_for("admin.admin_panel", week=res.get('locked_week')))
+    return redirect(url_for("admin.admin_panel", week=res.get("week_now")))
+
+
+@admin_bp.route("/refresh-spreads", methods=["POST"])
+@login_required
+def admin_refresh_spreads():
+    res = refresh_spreads_unlocked()
+    flash(
+        f"Spreads refreshed (UNLOCKED only): created={res['created']}, updated={res['updated']}, "
+        f"skipped_locked={res['skipped_locked']}.",
+        "success",
+    )
+    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+
+
+# ---------- ATS UTILITIES (POST buttons) ----------
+
+@admin_bp.route("/ats/snapshot_locked", methods=["POST"])
+@login_required
+def admin_ats_snapshot_locked():
+    games = Game.query.filter_by(spread_is_locked=True).all()
+    for g in games:
+        snapshot_closing_lines_for_game(g, line_source="Admin/Button")
+    db.session.commit()
+    flash(f"ATS closing spreads snapshotted for {len(games)} locked games.", "success")
+    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+
+
+@admin_bp.route("/ats/backfill", methods=["POST"])
+@login_required
+def admin_ats_backfill():
+    games = Game.query.all()
+    snap = fin = 0
+    for g in games:
+        if getattr(g, "spread_is_locked", False):
+            snapshot_closing_lines_for_game(g, line_source="Admin/Backfill")
+            snap += 1
+        if g.final_score_home is not None and g.final_score_away is not None:
+            finalize_ats_for_game(g)
+            fin += 1
+    db.session.commit()
+    flash(f"ATS backfill complete — snapshots={snap}, finalized={fin}", "success")
+    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+
+
+# ---------- ADMIN PANEL (GET) ----------
 
 @admin_bp.route("/panel", methods=["GET"])
 @login_required
 def admin_panel():
     # Week options
     week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
-    weeks: list[int] = [w for (w,) in week_rows] or [0]
+    weeks: List[int] = [w for (w,) in week_rows] or [0]
 
-    # Figure out the "current" week by kickoff date
-    now = datetime.now(timezone.utc)
-    current_week = (
-        db.session.query(Game.week)
-        .filter(Game.kickoff_at <= now)
-        .order_by(Game.week.desc())
-        .limit(1)
-        .scalar()
-    )
-    if current_week is None:
-        current_week = 0
+    # Use Tuesday-anchored calendar for "current" week
+    current_wk = current_week_number()
 
     # Selected week from query param
     selected_week = request.args.get("week", type=int)
     if selected_week is None:
         # default to current if it’s in weeks, else 0
-        selected_week = current_week if current_week in weeks else 0
+        selected_week = current_wk if current_wk in weeks else (weeks[-1] if weeks else 0)
     elif selected_week not in weeks:
         # if param isn’t valid, force to 0
         selected_week = 0
@@ -208,7 +173,6 @@ def admin_panel():
     # ----- ATS SUMMARY (season-to-date or single week) -----
     ats_scope = request.args.get("ats_scope", "season")  # "season" or "week"
 
-    # Build a grouped query: per team, count COVER / PUSH / NO_COVER up to the selected week
     covers = db.func.sum(db.case((TeamGameATS.ats_result == 'COVER', 1), else_=0))
     pushes = db.func.sum(db.case((TeamGameATS.ats_result == 'PUSH', 1), else_=0))
     nocovs = db.func.sum(db.case((TeamGameATS.ats_result == 'NO_COVER', 1), else_=0))
@@ -251,13 +215,12 @@ def admin_panel():
         weeks=weeks,
         selected_week=selected_week,
         matrix=matrix,
-        ats_scope=ats_scope,       
+        ats_scope=ats_scope,
         ats_summary=ats_summary,
     )
 
 
-
-
+# ---------- READ-ONLY LINES FRAGMENT (GET) ----------
 
 @admin_bp.route("/lines/fragment")
 @login_required
@@ -266,17 +229,17 @@ def admin_lines_fragment():
     week = request.args.get("week", type=int) or 0
     tzname = request.args.get("tz")
 
-    games = (Game.query
-                .filter(Game.week == week)
-                .order_by(Game.kickoff_at.asc(), Game.id.asc())
-                .all())
+    games = (
+        Game.query
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
 
     # build ats_by_game map (game_id, team) -> ats_result
     game_ids = [g.id for g in games]
-    ats_rows = []
-    if game_ids:
-        ats_rows = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids)).all()
-    ats_by_game = { (r.game_id, r.team): (r.ats_result or None) for r in ats_rows }
+    ats_rows = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids)).all() if game_ids else []
+    ats_by_game = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows}
 
     # group by day/time (same as your public fragment)
     days: "OrderedDict[tuple, dict]" = OrderedDict()
@@ -299,29 +262,3 @@ def admin_lines_fragment():
         disable_inputs=True,               # ⬅️ tells the partial to hide inputs
         ats_by_game=ats_by_game,
     )
-
-@admin_bp.route("/ats/snapshot_locked", methods=["POST"])
-@login_required
-def admin_ats_snapshot_locked():
-    games = Game.query.filter_by(spread_is_locked=True).all()
-    for g in games:
-        snapshot_closing_lines_for_game(g, line_source="Admin/Button")
-    db.session.commit()
-    flash(f"ATS closing spreads snapshotted for {len(games)} locked games.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
-
-@admin_bp.route("/ats/backfill", methods=["POST"])
-@login_required
-def admin_ats_backfill():
-    games = Game.query.all()
-    snap = fin = 0
-    for g in games:
-        if getattr(g, 'spread_is_locked', False):
-            snapshot_closing_lines_for_game(g, line_source="Admin/Backfill")
-            snap += 1
-        if g.final_score_home is not None and g.final_score_away is not None:
-            finalize_ats_for_game(g)
-            fin += 1
-    db.session.commit()
-    flash(f"ATS backfill complete — snapshots={snap}, finalized={fin}", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))

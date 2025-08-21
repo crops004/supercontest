@@ -21,11 +21,10 @@
     border-radius: .5rem;
     font-size: .9rem;
     border: 1px solid transparent;
-    }
-
-    .score-win  { background: #e6f4ea; border-color: #bfe3c7; color: #166534; }
-    .score-push { background: #fff8e1; border-color: #f6e7a8; color: #7a5d00; }
-    .score-lose { background: #fde8e7; border-color: #f5b5b2; color: #7f1d1d; }
+  }
+  .score-win  { background: #e6f4ea; border-color: #bfe3c7; color: #166534; }
+  .score-push { background: #fff8e1; border-color: #f6e7a8; color: #7a5d00; }
+  .score-lose { background: #fde8e7; border-color: #f5b5b2; color: #7f1d1d; }
 </style>
 {% endblock %}
 
@@ -33,146 +32,144 @@
 <div class="wrap">
   <h1 class="text-2xl font-bold mb-4">Admin Panel</h1>
 
-  <form method="post" action="{{ url_for('admin.admin_refresh_lines', week=selected_week) }}" class="inline">
-  <button class="px-4 py-2 rounded bg-blue-600 text-white">Refresh Regular-season Lines</button>
-</form>
-
-<form method="post" action="{{ url_for('admin.admin_refresh_lines_preseason', week=selected_week) }}" class="inline ml-2">
-  <button class="px-4 py-2 rounded bg-indigo-600 text-white">Refresh Preseason Lines</button>
-</form>
-
-  <form method="post" action="{{ url_for('admin.admin_lock_current_week', week=selected_week) }}">
-    <button class="px-4 py-2 rounded bg-amber-600 text-white">Lock current week lines (publish)</button>
-  </form>
-
-  <div class="mt-4 space-x-2">
-  <form method="post" action="{{ url_for('admin.admin_update_scores_regular', week=selected_week) }}" class="inline">
-    <button class="px-4 py-2 rounded bg-green-600 text-white">Update Regular Scores (3 days)</button>
-  </form>
-  <form method="post" action="{{ url_for('admin.admin_update_scores_preseason', week=selected_week) }}" class="inline">
-    <button class="px-4 py-2 rounded bg-emerald-700 text-white">Update Preseason Scores (3 days)</button>
-  </form>
-  <form action="{{ url_for('admin.admin_ats_snapshot_locked', week=selected_week) }}" method="post" style="display:inline;">
-  <button type="submit" class="btn btn-sm btn-primary">ATS Snapshot Locked</button>
-</form>
-
-<form action="{{ url_for('admin.admin_ats_backfill', week=selected_week) }}" method="post" style="display:inline;">
-  <button type="submit" class="btn btn-sm btn-warning">ATS Backfill</button>
-</form>
-
-</div>
-
-    <hr class="my-6">
-
-    <h2 class="text-xl font-semibold mb-3">Picks Matrix</h2>
-    <form method="get" action="{{ url_for('admin.admin_panel') }}" class="mb-4 flex items-center gap-2">
-        <label class="flex items-center gap-2">
-            <span>Week:</span>
-            <select name="week" class="border px-2 py-1">
-                {% for w in weeks %}
-                    <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
-                {% endfor %}
-            </select>
-        </label>
-        <button class="px-3 py-1 border bg-gray-100">Go</button>
+  <!-- Core admin actions (new routes) -->
+  <div class="mb-4 space-x-2">
+    <form method="post" action="{{ url_for('admin.admin_import_lines', week=selected_week) }}" class="inline">
+      <button class="px-4 py-2 rounded bg-blue-600 text-white">Import Lines (Pre + Regular)</button>
     </form>
 
-    
-    <table>
-        <thead>
-            <tr>
-                <th>User</th>
-                <th>Pick 1</th>
-                <th>Pick 2</th>
-                <th>Pick 3</th>
-                <th>Pick 4</th>
-                <th>Pick 5</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in matrix %}
-            <tr>
-                <td>{{ row.username }}</td>
-                {% for pk in row.picks %}
-                    <td class="{{ pk.status }}">
-                        {% if pk.team %}
-                            <div class="nickname">{{ pk.team|team_short }}</div>
-                        {% else %}
-                            &nbsp;
-                        {% endif %}
-                    </td>
-                {% endfor %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <hr class="my-6">
-
-    <!-- ATS Summary Controls -->
-<form method="get" action="{{ url_for('admin.admin_panel') }}" style="margin: 1rem 0;">
-  <input type="hidden" name="week" value="{{ selected_week }}">
-  <label>
-    <input type="radio" name="ats_scope" value="season" {{ 'checked' if ats_scope != 'week' else '' }}>
-    Season-to-date (≤ Week {{ selected_week }})
-  </label>
-  &nbsp;&nbsp;
-  <label>
-    <input type="radio" name="ats_scope" value="week" {{ 'checked' if ats_scope == 'week' else '' }}>
-    This week only (Week {{ selected_week }})
-  </label>
-  &nbsp;&nbsp;
-  <button type="submit" class="btn btn-sm">Update</button>
-</form>
-
-<!-- ATS Summary Table -->
-<table class="table" style="width:100%; border-collapse: collapse;">
-  <thead>
-    <tr>
-      <th style="text-align:left; border-bottom:1px solid #ddd; padding:.4rem;">Team</th>
-      <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Covers</th>
-      <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Pushes</th>
-      <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">No‑Covers</th>
-      <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Record</th>
-      <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Cover %</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in ats_summary %}
-    <tr>
-      <td style="padding:.4rem; border-bottom:1px solid #eee;">{{ row.team }}</td>
-      <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.covers }}</td>
-      <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.pushes }}</td>
-      <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.nocovers }}</td>
-      <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.record }}</td>
-      <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">
-        {{ '%.1f%%' % row.pct }}
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="6" style="padding:.6rem; color:#666;">No ATS data yet.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-
-    <hr class="my-6">
-
-    <h2 class="text-xl font-semibold mb-3">Weekly Lines (Admin Preview)</h2>
-    <form id="admin-lines-form" class="mb-4 flex items-center gap-2">
-            <label class="flex items-center gap-2">
-                <span>Week:</span>
-                <select id="admin-lines-week" name="week" class="border px-2 py-1">
-                    {% for w in weeks %}
-                        <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-        <span id="admin-lines-status" class="text-gray-600 text-sm"></span>
+    <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}" class="inline">
+      <button class="px-4 py-2 rounded bg-green-600 text-white">Import Scores (last 3 days)</button>
     </form>
 
-    <div id="admin-lines"></div>
+    <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}" class="inline">
+      <button class="px-4 py-2 rounded bg-amber-600 text-white">Lock Weeks Through Current</button>
+    </form>
 
+    <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}" class="inline">
+      <button class="px-4 py-2 rounded bg-indigo-600 text-white">Refresh Spreads (Unlocked Only)</button>
+    </form>
+  </div>
+
+  <!-- ATS utilities -->
+  <div class="mt-2 space-x-2">
+    <form action="{{ url_for('admin.admin_ats_snapshot_locked', week=selected_week) }}" method="post" class="inline">
+      <button type="submit" class="px-3 py-2 rounded bg-slate-700 text-white">ATS Snapshot Locked</button>
+    </form>
+
+    <form action="{{ url_for('admin.admin_ats_backfill', week=selected_week) }}" method="post" class="inline">
+      <button type="submit" class="px-3 py-2 rounded bg-yellow-600 text-white">ATS Backfill</button>
+    </form>
+  </div>
+
+  <hr class="my-6">
+
+  <h2 class="text-xl font-semibold mb-3">Picks Matrix</h2>
+  <form method="get" action="{{ url_for('admin.admin_panel') }}" class="mb-4 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span>Week:</span>
+      <select name="week" class="border px-2 py-1">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="px-3 py-1 border bg-gray-100">Go</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Pick 1</th>
+        <th>Pick 2</th>
+        <th>Pick 3</th>
+        <th>Pick 4</th>
+        <th>Pick 5</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in matrix %}
+      <tr>
+        <td>{{ row.username }}</td>
+        {% for pk in row.picks %}
+          <td class="{{ pk.status }}">
+            {% if pk.team %}
+              <div class="nickname">{{ pk.team|team_short }}</div>
+            {% else %}
+              &nbsp;
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr class="my-6">
+
+  <!-- ATS Summary Controls -->
+  <form method="get" action="{{ url_for('admin.admin_panel') }}" style="margin: 1rem 0;">
+    <input type="hidden" name="week" value="{{ selected_week }}">
+    <label>
+      <input type="radio" name="ats_scope" value="season" {{ 'checked' if ats_scope != 'week' else '' }}>
+      Season-to-date (≤ Week {{ selected_week }})
+    </label>
+    &nbsp;&nbsp;
+    <label>
+      <input type="radio" name="ats_scope" value="week" {{ 'checked' if ats_scope == 'week' else '' }}>
+      This week only (Week {{ selected_week }})
+    </label>
+    &nbsp;&nbsp;
+    <button type="submit" class="btn btn-sm">Update</button>
+  </form>
+
+  <!-- ATS Summary Table -->
+  <table class="table" style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:left; border-bottom:1px solid #ddd; padding:.4rem;">Team</th>
+        <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Covers</th>
+        <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Pushes</th>
+        <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">No‑Covers</th>
+        <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Record</th>
+        <th style="text-align:center; border-bottom:1px solid #ddd; padding:.4rem;">Cover %</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in ats_summary %}
+      <tr>
+        <td style="padding:.4rem; border-bottom:1px solid #eee;">{{ row.team }}</td>
+        <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.covers }}</td>
+        <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.pushes }}</td>
+        <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.nocovers }}</td>
+        <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">{{ row.record }}</td>
+        <td style="padding:.4rem; border-bottom:1px solid #eee; text-align:center;">
+          {{ '%.1f%%' % row.pct }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="padding:.6rem; color:#666;">No ATS data yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr class="my-6">
+
+  <h2 class="text-xl font-semibold mb-3">Weekly Lines (Admin Preview)</h2>
+  <form id="admin-lines-form" class="mb-4 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span>Week:</span>
+      <select id="admin-lines-week" name="week" class="border px-2 py-1">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <span id="admin-lines-status" class="text-gray-600 text-sm"></span>
+  </form>
+
+  <div id="admin-lines"></div>
 </div>
 {% endblock %}
 

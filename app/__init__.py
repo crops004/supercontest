@@ -32,10 +32,6 @@ def create_app():
 
     from app.leaderboard import bp as leaderboard_bp
     app.register_blueprint(leaderboard_bp)
-
-    # ✅ Register CLI commands
-    from .cli import register_cli   # <-- import here
-    register_cli(app)               # <-- call here
     
     @app.template_filter("team_short")
     def team_short(name: str) -> str:
