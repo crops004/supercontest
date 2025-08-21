@@ -60,8 +60,6 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     game.home_team = home
     game.away_team = away
     game.kickoff_at = kickoff_at
-    if hasattr(game, "start_time"):
-        game.start_time = kickoff_at
 
     # --- week handling ---
     if force_week is not None:

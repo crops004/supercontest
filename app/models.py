@@ -24,7 +24,6 @@ class Game(db.Model):
     week = db.Column(db.Integer, nullable=False)
     home_team = db.Column(db.String(50), nullable=False)
     away_team = db.Column(db.String(50), nullable=False)
-    start_time = db.Column(db.DateTime(timezone=True), nullable=False)
     final_score_home = db.Column(db.Integer)
     final_score_away = db.Column(db.Integer)
     spread_home = db.Column(db.Numeric, nullable=True)
@@ -36,7 +35,7 @@ class Game(db.Model):
     spread_locked_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     def has_started(self):
-        return datetime.now(timezone.utc) >= self.start_time  # <- aware compare
+        return datetime.now(timezone.utc) >= self.kickoff_at  # <- aware compare
     
     @property
     def has_final_score(self):
