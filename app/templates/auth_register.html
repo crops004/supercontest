@@ -1,11 +1,18 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
 <!DOCTYPE html>
 <html>
 <head><title>Register</title></head>
 <body>
   <h1>Register</h1>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}<ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% with messages = get_flashed_messages(category_filter=['auth', 'auth_error', 'auth_success']) %}
+    {% if messages %}
+      <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
   {% endwith %}
 
   <form method="POST">
@@ -21,3 +28,5 @@
   <p><a href="{{ url_for('main.home') }}">Home</a></p>
 </body>
 </html>
+
+{% endblock %}

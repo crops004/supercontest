@@ -16,15 +16,15 @@ def register():
         password = request.form.get('password','')
 
         if not username or not password:
-            flash("Username and password are required.")
+            flash("Username and password are required.", 'auth_error')
             return redirect(url_for('auth.register'))
 
         if User.query.filter_by(username=username).first():
-            flash("Username already taken.")
+            flash("Username already taken.", 'auth_error')
             return redirect(url_for('auth.register'))
 
         if email and User.query.filter_by(email=email).first():
-            flash("Email already in use.")
+            flash("Email already in use.", 'auth_error')
             return redirect(url_for('auth.register'))
 
         first = request.form.get('first_name','').strip()
@@ -39,7 +39,7 @@ def register():
         db.session.add(u)
         db.session.commit()
 
-        flash("Registration successful. Please log in.")
+        flash("Registration successful. Please log in.", 'auth_success')
         return redirect(url_for('auth.login'))
 
     return render_template('auth_register.html')
@@ -72,5 +72,5 @@ def login():
 @login_required
 def logout():
     logout_user()
-    flash("Logged out.", 'auth_info')
+    flash("Logged out.", 'auth')
     return redirect(url_for('main.home'))

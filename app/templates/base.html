@@ -11,7 +11,15 @@
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
-
+    {% with msgs = get_flashed_messages(with_categories=True) %}
+        {% if msgs %}
+            <ul class="flashes">
+                {% for category, m in msgs %}
+                    <li class="flash {{ category }}">{{ m }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
     <!-- Navbar -->
     <nav class="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
         <div>
