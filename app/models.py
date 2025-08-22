@@ -33,7 +33,8 @@ class Game(db.Model):
     kickoff_at = db.Column(db.DateTime(timezone=True), nullable=True)
     spread_is_locked = db.Column(db.Boolean, default=False)
     spread_locked_at = db.Column(db.DateTime(timezone=True), nullable=True)
-
+    completed = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    
     def has_started(self):
         return datetime.now(timezone.utc) >= self.kickoff_at  # <- aware compare
     

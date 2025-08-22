@@ -1,5 +1,4 @@
 {% set ats_by_game = ats_by_game|default({}) %}
-<!-- tz={{ tzname or 'None' }} -->
 {% set disable = disable_inputs|default(false) %}
 {% if groups|length == 0 %}
   <p>No games for this week.</p>
@@ -61,8 +60,19 @@
               <span class="team">
                 {{ g.away_team }}
                 {% if g.final_score_away is not none %}
-                  {% set r = ats_by_game.get((g.id, g.away_team)) %}
-                  {% set cls = 'score-badge ' + ('score-win' if r=='COVER' else 'score-push' if r=='PUSH' else 'score-lose' if r=='NO_COVER' else '') %}
+                  {% set cls = 'score-badge' %}
+                  {% if g.completed %}
+                    {% set r = ats_by_game.get((g.id, g.away_team)) %}
+                    {% if not r and g.spread_away is not none %}
+                      {% set away_adj = g.final_score_away + g.spread_away %}
+                      {% if away_adj > g.final_score_home %}{% set r = 'COVER' %}
+                      {% elif away_adj < g.final_score_home %}{% set r = 'NO_COVER' %}
+                      {% else %}{% set r = 'PUSH' %}{% endif %}
+                    {% endif %}
+                    {% if r == 'COVER' %}{% set cls = cls + ' score-win' %}
+                    {% elif r == 'NO_COVER' %}{% set cls = cls + ' score-lose' %}
+                    {% elif r == 'PUSH' %}{% set cls = cls + ' score-push' %}{% endif %}
+                  {% endif %}
                   <span class="{{ cls }}">{{ g.final_score_away }}</span>
                 {% endif %}
               </span>
@@ -94,8 +104,19 @@
               <span class="team">
                 {{ g.home_team }}
                 {% if g.final_score_home is not none %}
-                  {% set r = ats_by_game.get((g.id, g.home_team)) %}
-                  {% set cls = 'score-badge ' + ('score-win' if r=='COVER' else 'score-push' if r=='PUSH' else 'score-lose' if r=='NO_COVER' else '') %}
+                  {% set cls = 'score-badge' %}
+                  {% if g.completed %}
+                    {% set r = ats_by_game.get((g.id, g.home_team)) %}
+                    {% if not r and g.spread_home is not none %}
+                      {% set home_adj = g.final_score_home + g.spread_home %}
+                      {% if home_adj > g.final_score_away %}{% set r = 'COVER' %}
+                      {% elif home_adj < g.final_score_away %}{% set r = 'NO_COVER' %}
+                      {% else %}{% set r = 'PUSH' %}{% endif %}
+                    {% endif %}
+                    {% if r == 'COVER' %}{% set cls = cls + ' score-win' %}
+                    {% elif r == 'NO_COVER' %}{% set cls = cls + ' score-lose' %}
+                    {% elif r == 'PUSH' %}{% set cls = cls + ' score-push' %}{% endif %}
+                  {% endif %}
                   <span class="{{ cls }}">{{ g.final_score_home }}</span>
                 {% endif %}
               </span>

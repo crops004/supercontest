@@ -3,7 +3,7 @@
 {% block title %}Supercontest Home{% endblock %}
 
 {% block content %}
-  <h1 class="text-2xl font-bold mb-4">🏈 Supercontest</h1>
+  <h1 class=" text-2xl font-bold mb-4">🏈 Supercontest</h1>
 
   {% if current_user.is_authenticated %}
     <p class="mb-4">
@@ -28,6 +28,6 @@
 
   <ul class="list-disc pl-6 space-y-1">
     <li><a class="text-blue-700 underline" href="{{ url_for('main.weekly_lines') }}">Make Picks</a></li>
-    <li><a class="text-blue-700 underline" href="{{ url_for('leaderboard.leaderboard') }}">View Leaderboard</a></li>
+    <li><a class="text-blue-700 underline" href="{{ url_for('leaderboard.leaderboard') }}">View Standings</a></li>
   </ul>
 {% endblock %}

@@ -80,32 +80,73 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
 
 def update_game_scores_from_score_event(game: Game, score_ev: Dict[str, Any]) -> bool:
     """
-    Update final scores on the Game from an Odds API 'scores' payload.
-    Returns True if the game was modified.
+    Robustly map /scores rows to home/away using the event's own home/away first,
+    then fall back to DB names. Case-insensitive, whitespace-trimmed.
+    Also sets `completed` from payload.
+    Returns True if anything changed.
     """
-    scores = score_ev.get("scores") or []
-    name_to_pts: Dict[str, int] = {}
-    for s in scores:
-        nm = s.get("name")
-        raw = s.get("score")
+    changed = False
+
+    # 1) Completed flag from /scores payload
+    completed_payload = bool(score_ev.get("completed"))
+    if getattr(game, "completed", False) != completed_payload:
+        game.completed = completed_payload
+        changed = True
+
+    # 2) Build a case-insensitive map of name -> points
+    rows = score_ev.get("scores") or []
+    name_to_pts_ci: Dict[str, int] = {}
+    for row in rows:
+        nm = (row.get("name") or "").strip()
+        raw = row.get("score")
         if not nm or raw is None:
             continue
         try:
-            name_to_pts[nm] = int(raw)
+            name_to_pts_ci[nm.lower()] = int(raw)
         except (TypeError, ValueError):
             continue
 
-    home_pts = name_to_pts.get(game.home_team)
-    away_pts = name_to_pts.get(game.away_team)
+    # Helpers to pick a score by preferred labels
+    def pick_points(preferred: Optional[str], fallback: Optional[str]) -> Optional[int]:
+        """
+        Try exact case-insensitive match for preferred, else fallback.
+        Return None if not found.
+        """
+        for candidate in (preferred, fallback):
+            if not candidate:
+                continue
+            key = candidate.strip().lower()
+            if key in name_to_pts_ci:
+                return name_to_pts_ci[key]
+        return None
 
-    changed = False
-    # NOTE: using your column names final_score_home/final_score_away
-    if home_pts is not None and getattr(game, "final_score_home", None) != home_pts:
+    # 3) Prefer event's own labels; fall back to DB labels if needed
+    ev_home = score_ev.get("home_team")
+    ev_away = score_ev.get("away_team")
+
+    home_pts = pick_points(ev_home, game.home_team)
+    away_pts = pick_points(ev_away, game.away_team)
+
+    # 4) Write scores (even when not completed so you can show neutral bubbles live)
+    if home_pts is not None and game.final_score_home != home_pts:
         game.final_score_home = home_pts
         changed = True
-    if away_pts is not None and getattr(game, "final_score_away", None) != away_pts:
+
+    if away_pts is not None and game.final_score_away != away_pts:
         game.final_score_away = away_pts
         changed = True
+
+    # 5) Log mapping misses (helps catch provider hiccups)
+    if home_pts is None:
+        current_app.logger.warning(
+            "Scores mapping miss (home): event_id=%s ev_home='%s' db_home='%s' rows=%s",
+            score_ev.get("id"), ev_home, game.home_team, [r.get("name") for r in rows]
+        )
+    if away_pts is None:
+        current_app.logger.warning(
+            "Scores mapping miss (away): event_id=%s ev_away='%s' db_away='%s' rows=%s",
+            score_ev.get("id"), ev_away, game.away_team, [r.get("name") for r in rows]
+        )
 
     if changed:
         db.session.add(game)

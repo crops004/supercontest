@@ -170,8 +170,6 @@
     const base = "{{ url_for('main.weekly_lines_fragment') }}";
     const params = new URLSearchParams({ week: String(w), tz: userTZ });
     const url = `${base}?${params.toString()}`;
-    console.log('[weekly] userTZ =', userTZ);
-    console.log('[weekly] GET', url);
 
     try {
       const url = "{{ url_for('main.weekly_lines_fragment') }}" +

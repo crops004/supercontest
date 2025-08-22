@@ -1,6 +1,10 @@
-# Byte-compiled / cache
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
 
 # Virtual environment
 venv/
@@ -17,3 +21,12 @@ venv/
 .DS_Store
 *.session.sql
 buildOrder/
+
+# Tailwind build output
+app/static/dist/output.css
+app/static/dist/output.css.map
+
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
