@@ -2,13 +2,14 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user, login_required
 from app.extensions import db
 from app.models import User
+from urllib.parse import urlparse, urljoin
 
 bp = Blueprint('auth', __name__)
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('main.home'))
+        return redirect(url_for("standings.standings"))
 
     if request.method == 'POST':
         username = request.form.get('username','').strip()
@@ -45,10 +46,16 @@ def register():
     return render_template('auth_register.html')
 
 
+def _is_safe_next_url(target: str) -> bool:
+    """Prevent open-redirects: only allow same-host absolute URLs."""
+    ref = urlparse(request.host_url)
+    test = urlparse(urljoin(request.host_url, target))
+    return (test.scheme in ("http", "https")) and (ref.netloc == test.netloc)
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('main.home'))
+        return redirect(url_for("standings.standings"))
 
     if request.method == 'POST':
         username = request.form.get('username','').strip()
@@ -62,8 +69,12 @@ def login():
 
         login_user(user, remember=remember)
         flash("Logged in!", 'auth_success')
-        next_url = request.args.get('next') or url_for('main.home')
-        return redirect(next_url)
+
+        next_url = request.args.get('next')
+        if next_url and _is_safe_next_url(next_url):
+            return redirect(next_url)
+        # Fallback to standings (or "/" if you mapped standings to root)
+        return redirect(url_for('standings.standings'))
 
     return render_template('auth_login.html')
 
@@ -73,4 +84,4 @@ def login():
 def logout():
     logout_user()
     flash("Logged out.", 'auth')
-    return redirect(url_for('main.home'))
+    return redirect(url_for("standings.standings"))

@@ -1,0 +1,80 @@
+<style>
+  .table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  .table thead th { background:#f8fafc; font-weight:600; text-align:left; padding:12px; border-bottom:1px solid #e5e7eb; }
+  .table tbody td { padding:12px; border-bottom:1px solid #f1f5f9; vertical-align: middle; }
+  .table tbody tr:hover { background:#f8fafc; }
+  .center { text-align:center; }
+  .right { text-align:right; white-space:nowrap; }
+
+  /* chips (keep your colors) */
+  .chip{ display:inline-block; padding:2px 8px; border-radius:999px; font-weight:600; font-size:0.9rem; line-height:1.6; }
+  .chip.win{ background:#dcfce7; color:#166534;}
+  .chip.loss{background:#fee2e2;color:#991b1b;}
+  .chip.push{background:#fef9c3;color:#92400e;}
+  .chip.pending{background:#f3f4f6;color:#4b5563;}
+  .chip.placeholder{ background:#f3f4f6; color:#9ca3af; }
+  .muted{color:#9ca3af;}
+  .hdr-top th { padding:6px 12px; font-size:0.9rem; background:#f8fafc; }
+  .th-center { text-align:center; }
+</style>
+
+<div class="overflow-x-auto border border-gray-200 rounded-xl">
+  <table class="table">
+    <thead>
+      <tr class="hdr-top">
+        <th colspan="6"></th>
+        <th class="th-center" colspan="3">This Week</th>
+        <th class="th-center" colspan="3">Overall</th>
+        <th></th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>Pick 1</th><th>Pick 2</th><th>Pick 3</th><th>Pick 4</th><th>Pick 5</th>
+        <th class="center">W</th><th class="center">L</th><th class="center">P</th>
+        <th class="center">W</th><th class="center">L</th><th class="center">P</th>
+        <th class="right">Pts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.display_name }}</strong></td>
+
+        {% for p in r.weekly_picks %}
+          <td>
+            {% set s = p.status %}
+            {# Visible picks: show abbrev, color by status #}
+            {% if p.label and s in ['win','loss','push','pending'] %}
+              <span class="chip {{ s }}" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
+
+            {# Your own unlocked pick (pre): muted but visible #}
+            {% elif p.label and s == 'pre' %}
+              <span class="chip pending" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
+
+            {# Hidden (someone else’s not yet locked): show placeholder #}
+            {% elif s == 'hidden' %}
+              <span class="chip placeholder" title="Hidden until lock">?</span>
+
+            {# No pick yet: placeholder #}
+            {% else %}
+              <span class="chip placeholder" title="No pick yet">?</span>
+            {% endif %}
+          </td>
+        {% endfor %}
+
+        {% set w,l,psh = r.week_WLP %}
+        <td class="center font-semibold">{{ w }}</td>
+        <td class="center font-semibold">{{ l }}</td>
+        <td class="center font-semibold">{{ psh }}</td>
+
+        {% set sw,sl,sp = r.season_WLP %}
+        <td class="center font-semibold">{{ sw }}</td>
+        <td class="center font-semibold">{{ sl }}</td>
+        <td class="center font-semibold">{{ sp }}</td>
+
+        <td class="right font-bold">{{ "%.1f"|format(r.points) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

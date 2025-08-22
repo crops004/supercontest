@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-[1100px] mx-auto p-4">
+  <!-- Header with arrows + current week -->
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      {% if show_left %}
+        {% if mock_week is not none %}
+          <a class="inline-block px-2 py-1 border border-gray-300 rounded-md" href="{{ url_for('standings.standings', week=display_week-1, mock_week=mock_week) }}" aria-label="Previous week">←</a>
+        {% else %}
+          <a class="inline-block px-2 py-1 border border-gray-300 rounded-md" href="{{ url_for('standings.standings', week=display_week-1) }}" aria-label="Previous week">←</a>
+        {% endif %}
+      {% endif %}
+
+      <strong class="text-[1.1rem]">Week {{ display_week }}</strong>
+
+      {% if show_right %}
+        {% if mock_week is not none %}
+          <a class="inline-block px-2 py-1 border border-gray-300 rounded-md" href="{{ url_for('standings.standings', week=display_week+1, mock_week=mock_week) }}" aria-label="Next week">→</a>
+        {% else %}
+          <a class="inline-block px-2 py-1 border border-gray-300 rounded-md" href="{{ url_for('standings.standings', week=display_week+1) }}" aria-label="Next week">→</a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="text-gray-500 text-sm">Current week: {{ current_week }}</div>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="block sm:hidden" aria-label="Standings (mobile)">
+    {% include "partials/_standings_mobile.html" %}
+  </div>
+
+  <!-- Desktop table -->
+  <div class="hidden sm:block" aria-label="Standings (desktop)" aria-hidden="true">
+    {% include "partials/_standings_table.html" %}
+  </div>
+</div>
+
+{% endblock %}

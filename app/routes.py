@@ -58,26 +58,10 @@ def visible_weeks():
     )
     return [w for (w,) in rows]
 
-# --- Jinja format helpers ---
-@bp.app_template_filter("fmt_spread")
-def fmt_spread(value):
-    if value is None:
-        return ""
-    v = float(value)
-    return str(int(v)) if v.is_integer() else f"{v:.1f}"
-
-@bp.app_template_global()
-def is_pickem(game: Game) -> bool:
-    """True when both sides are 0 (or effectively 0)."""
-    sh, sa = game.spread_home, game.spread_away
-    if sh is None or sa is None:
-        return False
-    return abs(float(sh)) < 1e-9 and abs(float(sa)) < 1e-9
-
 # --- ROUTES ---
 @bp.route('/')
-def home():
-    return render_template('home.html')
+def root():
+    return redirect(url_for("standings.standings"))
 
 # --- Weekly lines page (public; show only locked/published weeks/games) ---
 @bp.route("/lines")
@@ -313,5 +297,5 @@ def submit_picks():
         inserted += 1
 
     db.session.commit()
-    flash(f"Saved {inserted} pick(s).", "success")
+    # flash(f"Saved {inserted} pick(s).", "success")
     return redirect(url_for("main.weekly_lines", week=week, tz=tzname))

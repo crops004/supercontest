@@ -23,12 +23,12 @@
     <!-- Navbar -->
     <nav class="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
         <div>
-            <a href="{{ url_for('main.home') }}" class="font-bold hover:text-gray-300">🏈</a>
+            <a href="{{ url_for('standings.standings') }}" class="font-bold hover:text-gray-300">🏈</a>
         </div>
         <div class="space-x-4">
             {% if current_user.is_authenticated %}
                 <a href="{{ url_for('main.weekly_lines') }}" class="hover:text-gray-300">Picks</a>
-                <a href="{{ url_for('leaderboard.leaderboard') }}" class="hover:text-gray-300">Standings</a>
+                <a href="{{ url_for('standings.standings') }}" class="hover:text-gray-300">Standings</a>
                 
                 {% if current_user.is_admin %}
                     <a href="{{ url_for('admin.admin_panel') }}" class="text-yellow-400 font-semibold hover:text-yellow-300">Admin</a>

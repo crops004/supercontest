@@ -2,8 +2,8 @@ from flask import Flask
 from config import get_config
 from datetime import datetime
 from app.extensions import db, migrate, login_manager
-import logging
-import sys
+from app.filters import register_template_utils
+import logging, sys
 
 def create_app():
     app = Flask(__name__)
@@ -18,27 +18,17 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'   # pyright: ignore[reportAttributeAccessIssue] # where to redirect if not logged in
 
+    # Register filters/globals in one place
+    register_template_utils(app)
+
     from . import models  # import models before creating tables
     
     # Blueprints
-    from .routes import bp as main_bp
-    app.register_blueprint(main_bp)
+    from .routes import bp as main_bp; app.register_blueprint(main_bp)
+    from .auth import bp as auth_bp; app.register_blueprint(auth_bp, url_prefix='/auth')
+    from .admin_routes import admin_bp; app.register_blueprint(admin_bp)
+    from app.standings import bp as standings_bp; app.register_blueprint(standings_bp)
 
-    from .auth import bp as auth_bp
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-
-    from .admin_routes import admin_bp
-    app.register_blueprint(admin_bp)
-
-    from app.leaderboard import bp as leaderboard_bp
-    app.register_blueprint(leaderboard_bp)
-    
-    @app.template_filter("team_short")
-    def team_short(name: str) -> str:
-        if not name:
-            return ""
-        return name.split()[-1]  # "Washington Commanders" -> "Commanders"
-    
     @app.context_processor
     def inject_now():
         return {'now': datetime.utcnow}

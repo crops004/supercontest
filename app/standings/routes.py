@@ -30,11 +30,11 @@ def get_current_week() -> int:
 
 
 # --- routes ---
-@bp.route("/", methods=["GET"], endpoint="leaderboard")
+@bp.route("/", methods=["GET"], endpoint="standings")
 @login_required
-def leaderboard():
+def standings():
     """
-    Combined leaderboard:
+    Combined standings:
       - Header shows displayed week with left/right arrows (clamped to [min_week, current_week])
       - Each row = user
         * 5 picks for displayed week: show user’s own picks pre‑kickoff; others show '—' until kickoff
@@ -185,7 +185,7 @@ def leaderboard():
     show_right = display_week < cur_week
 
     return render_template(
-        "leaderboard_combined.html",
+        "standings.html",
         rows=rows,
         display_week=display_week,
         current_week=cur_week,
