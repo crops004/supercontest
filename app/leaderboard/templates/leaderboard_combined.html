@@ -79,6 +79,8 @@
               {% if p.label %}
                 {% if p.status in ['win','loss','push','pending'] %}
                   <span class="chip {{ p.status }}">{{ p.label|team_short }}</span>
+                {% elif p.status == 'pre' %}
+                  <span class="chip pending">{{ p.label|team_short }}</span>
                 {% elif p.status == 'hidden' %}
                   <span class="muted">—</span>
                 {% else %}
