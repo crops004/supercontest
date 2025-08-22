@@ -11,15 +11,6 @@
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
-    {% with msgs = get_flashed_messages(with_categories=True) %}
-        {% if msgs %}
-            <ul class="flashes">
-                {% for category, m in msgs %}
-                    <li class="flash {{ category }}">{{ m }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
     <!-- Navbar -->
     <nav class="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
         <div>
@@ -52,6 +43,50 @@
         © {{ now().year }} Supercontest
     </footer>
 
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+    <!-- Toast stack -->
+    <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+    // Tailwind toasts
+    window.renderToasts = (flashes) => {
+        if (!flashes || !flashes.length) return;
+        const wrap = document.getElementById("toast-wrap");
+        flashes.forEach(([cat, msg]) => {
+        const el = document.createElement("div");
+        const color =
+            cat === "success" ? "bg-green-600" :
+            cat === "warning" ? "bg-yellow-600" :
+            cat === "error"   ? "bg-red-600" :
+                                "bg-gray-900";
+        el.className = `flex items-start gap-2 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${color} transition-opacity duration-200`;
+        el.innerHTML = `
+            <span class="leading-5">${msg}</span>
+            <button class="ml-2 text-lg leading-none opacity-80 hover:opacity-100" aria-label="Close">&times;</button>
+        `;
+        wrap.appendChild(el);
+        const close = () => { el.style.opacity = 0; setTimeout(() => el.remove(), 200); };
+        el.querySelector("button").addEventListener("click", close);
+        setTimeout(close, 4200);
+        });
+    };
+    </script>
+
+    <!-- global flashes -->
+    {# Server -> JSON (not JS) #}
+    {% set flashes = get_flashed_messages(with_categories=True) %}
+    <script id="flashes-data" type="application/json">
+    {{ flashes | tojson }}
+    </script>
+
+    {# JS reads JSON and shows toasts #}
+    <script>
+    (function () {
+        const raw = document.getElementById('flashes-data')?.textContent || '[]';
+        const flashes = JSON.parse(raw);
+        window.renderToasts(flashes);
+    })();
+    </script>
+    {% endblock %}
 </body>
 </html> 
