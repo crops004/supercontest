@@ -29,4 +29,3 @@ app/static/dist/output.css.map
 # Node
 node_modules/
 npm-debug.log*
-package-lock.json
