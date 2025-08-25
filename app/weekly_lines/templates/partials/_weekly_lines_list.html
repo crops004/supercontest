@@ -1,34 +1,31 @@
 {% set ats_by_game = ats_by_game|default({}) %}
 {% set disable = disable_inputs|default(false) %}
 
-{# Colored score badge:
-   - pending => neutral badge with the current numeric score if available, else —
-   - final   => win/lose/push coloring based on numeric comparison
-#}
+{# Tailwind-only score badge #}
 {% macro score_badge_for(val, other, is_final) -%}
   {% if not is_final %}
     {% if val is not none %}
-      <span class="score-badge score-pending" title="In progress">{{ val }}</span>
+      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600" title="In progress">{{ val }}</span>
     {% else %}
-      <span class="score-badge score-pending" title="Not started">—</span>
+      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600" title="Not started">—</span>
     {% endif %}
   {% elif val > other %}
-    <span class="score-badge score-win" title="Winner">{{ val }}</span>
+    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-green-100 border-green-200 text-green-800" title="Winner">{{ val }}</span>
   {% elif val < other %}
-    <span class="score-badge score-lose" title="Loser">{{ val }}</span>
+    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-red-100 border-red-200 text-red-800" title="Loser">{{ val }}</span>
   {% else %}
-    <span class="score-badge score-push" title="Tie">{{ val }}</span>
+    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-yellow-100 border-yellow-200 text-yellow-800" title="Tie">{{ val }}</span>
   {% endif %}
 {%- endmacro %}
 
 {% if groups|length == 0 %}
-  <p>No games for this week.</p>
+  <p class="text-sm text-gray-500">No games for this week.</p>
 {% else %}
   {% for day_title, times in groups %}
-    <h2 style="margin:1rem 0 .25rem; font-weight:700;">{{ day_title }}</h2>
+    <h2 class="my-4 font-bold text-gray-900">{{ day_title }}</h2>
 
     {% for time_title, items in times %}
-      <h3 style="margin:.25rem 0 .25rem; font-weight:600;">{{ time_title }}</h3>
+      <h3 class="my-1 font-semibold text-gray-800 text-sm">{{ time_title }}</h3>
 
       {% for g in items %}
         {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
@@ -38,11 +35,11 @@
         {# Final = explicit completed flag if present; else require both final scores #}
         {% set is_final = (g.completed if g.completed is not none else (g.final_score_home is not none and g.final_score_away is not none)) %}
 
-        <div class="game" style="padding:.6rem 0; border-top:1px solid #ddd;">
+        <div class="py-2 border-t border-gray-200">
 
           <!-- Away (top) -->
-          <div class="row" style="display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
-            <label style="display:flex; gap:.5rem; align-items:center; flex:1;">
+          <div class="flex justify-between items-center gap-2">
+            <label class="flex gap-2 items-center flex-1">
               {% if current_user.is_authenticated and not disable %}
                 <input
                   class="pick-box"
@@ -55,12 +52,12 @@
                   {% if chosen == g.away_team %}checked{% endif %}
                 />
               {% endif %}
-              <span class="team">
+              <span class="whitespace-nowrap">
                 {{ g.away_team }}
                 {{ score_badge_for(g.final_score_away, g.final_score_home, is_final) }}
               </span>
             </label>
-            <div class="line" style="min-width:2.5rem; text-align:right;">
+            <div class="min-w-[2.5rem] text-right">
               {% if is_pickem(g) %}
                 PK
               {% else %}
@@ -70,8 +67,8 @@
           </div>
 
           <!-- Home (bottom) -->
-          <div class="row" style="display:flex; justify-content:space-between; align-items:center; gap:.5rem;">
-            <label style="display:flex; gap:.5rem; align-items:center; flex:1;">
+          <div class="flex justify-between items-center gap-2">
+            <label class="flex gap-2 items-center flex-1">
               {% if current_user.is_authenticated and not disable %}
                 <input
                   class="pick-box"
@@ -84,12 +81,12 @@
                   {% if chosen == g.home_team %}checked{% endif %}
                 />
               {% endif %}
-              <span class="team">
+              <span class="whitespace-nowrap">
                 {{ g.home_team }}
                 {{ score_badge_for(g.final_score_home, g.final_score_away, is_final) }}
               </span>
             </label>
-            <div class="line" style="min-width:2.5rem; text-align:right;">
+            <div class="min-w-[2.5rem] text-right">
               {% if is_pickem(g) %}
                 PK
               {% else %}

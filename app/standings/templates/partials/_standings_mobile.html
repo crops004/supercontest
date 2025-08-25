@@ -1,54 +1,29 @@
-<style>
-  /* simple card & chip styles that don’t require Tailwind build */
-  .lb-card{ background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:.75rem .9rem; margin:.6rem 0; }
-  .lb-head{ display:flex; flex-direction:column; gap:.25rem; }
-  .lb-name{ font-weight:700; }
-  .lb-metrics{ font-size:.9rem; color:#111; display:flex; flex-wrap:wrap; gap:.35rem; }
-  .muted{ color:#6b7280; }
-  .sep{ color:#d1d5db; }
-  .chips{ margin-top:.55rem; display:flex; flex-wrap:wrap; gap:.4rem; }
-  .chip.placeholder{ background:#f3f4f6; border:1px solid #e5e7eb; color:#9ca3af; }
-
-  .chip{ display:inline-block; padding:.25rem .55rem; border-radius:999px; background:#f3f4f6; font-size:.9rem; line-height:1; border:1px solid #e5e7eb; }
-  .chip.win{  background:#dcfce7; border-color:#bbf7d0; }
-  .chip.loss{ background:#fee2e2; border-color:#fecaca; }
-  .chip.push{ background:#fef9c3; border-color:#fde68a; }
-  .chip.pending{ background:#f3f4f6; border-color:#e5e7eb; }
-</style>
-
 {% for r in rows %}
-  <details class="lb-card">
-    <summary class="lb-head cursor-pointer">
-      <div class="lb-name">{{ r.display_name }}</div>
-      <div class="lb-metrics">
-        <span class="muted">This wk:</span>
+  <details class="bg-white border border-gray-200 rounded-2xl p-3 my-2">
+    <summary class="flex flex-col gap-1 cursor-pointer">
+      <div class="font-bold">{{ r.display_name }}</div>
+      <div class="text-[0.95rem] text-gray-900 flex flex-wrap gap-1">
+        <span class="text-gray-500">This wk:</span>
         {% set w,l,psh = r.week_WLP %} {{ w }}‑{{ l }}‑{{ psh }}
-        <span class="sep">•</span>
-        <span class="muted">Overall:</span>
+        <span class="text-gray-300">•</span>
+        <span class="text-gray-500">Overall:</span>
         {% set sw,sl,sp = r.season_WLP %} {{ sw }}‑{{ sl }}‑{{ sp }}
-        <span class="sep">•</span>
-        <span class="muted">Pts:</span> {{ "%.1f"|format(r.points) }}
+        <span class="text-gray-300">•</span>
+        <span class="text-gray-500">Pts:</span> {{ "%.1f"|format(r.points) }}
       </div>
     </summary>
 
-    {# picks (chips) #}
-    {% set any = false %}
-    <div class="chips">
+    <!-- picks (chips) -->
+    <div class="mt-2 flex flex-wrap gap-2">
       {% for p in r.weekly_picks %}
         {% set s = p.status %}
-        {# Visible picks: show abbrev, color by status #}
+
         {% if p.label and s in ['win','loss','push','pending'] %}
           <span class="chip {{ s }}" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
-
-        {# Your own unlocked picks generally come through as 'pre'—keep visible but muted #}
         {% elif p.label and s == 'pre' %}
           <span class="chip pending" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
-
-        {# Hidden (another user’s pick before lock): show muted placeholder #}
         {% elif s == 'hidden' %}
           <span class="chip placeholder" title="Hidden until lock">?</span>
-
-        {# No pick made yet: muted placeholder too #}
         {% else %}
           <span class="chip placeholder" title="No pick yet">?</span>
         {% endif %}

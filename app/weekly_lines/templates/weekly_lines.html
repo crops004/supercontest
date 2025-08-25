@@ -2,49 +2,27 @@
 
 {% block title %}Weekly Lines{% endblock %}
 
-{% block head %}
-<style>
-  .container { max-width: 720px; margin: 1.5rem auto; padding: 0 1rem; }
-  .controls { margin-bottom: 1rem; display: flex; gap: .5rem; align-items: center; }
-  .btn { padding: .25rem .5rem; border: 1px solid #ccc; background: #f7f7f7; cursor: pointer; }
-  .btn[disabled] { opacity: .5; cursor: default; }
-  .game { padding: .75rem 0; border-top: 1px solid #ddd; }
-  .row { display: flex; justify-content: space-between; align-items: center; }
-  .team { white-space: nowrap; }
-  .line { margin-left: .75rem; min-width: 2.5rem; text-align: right; }
-  .muted { color: #666; font-size: .9rem; }
-  .spacer { flex: 1; }
-
-  .score-badge {
-    display: inline-block;
-    margin-left: .4rem;
-    padding: 0 .4rem;
-    border-radius: .5rem;
-    font-size: .9rem;
-    border: 1px solid transparent;
-  }
-  .final-flag { display:block; font-size:.8rem; color:#666; margin-top:.15rem; }
-  .score-win  { background: #e6f4ea; border-color: #bfe3c7; color: #166534; }
-  .score-push { background: #fff8e1; border-color: #f6e7a8; color: #7a5d00; }
-  .score-lose { background: #fde8e7; border-color: #f5b5b2; color: #7f1d1d; }
-</style>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block content %}
-<div class="container">
-  <h1>Weekly Lines</h1>
+<div class="max-w-[720px] mx-auto my-6 px-4">
+  <h1 class="text-xl font-semibold mb-3">Weekly Lines</h1>
 
-  <div class="controls">
-    <button id="prev" class="btn" type="button">‹ Prev</button>
-    <label for="week">Week:</label>
-    <select id="week" name="week">
+  <div class="mb-4 flex items-center gap-2">
+    <button id="prev" class="px-2 py-1 border border-gray-300 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default" type="button">‹ Prev</button>
+
+    <label for="week" class="text-sm text-gray-700">Week:</label>
+    <select id="week" name="week" class="px-2 py-1 border border-gray-300 rounded bg-white text-sm">
       {% for w in weeks %}
         <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
       {% endfor %}
     </select>
-    <button id="next" class="btn" type="button">Next ›</button>
-    <span class="spacer"></span>
-    <span id="status" class="muted"></span>
+
+    <button id="next" class="px-2 py-1 border border-gray-300 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default" type="button">Next ›</button>
+
+    <span class="flex-1"></span>
+
+    <span id="status" class="text-sm text-gray-500"></span>
   </div>
 
   <form id="picks-form" method="post" action="{{ url_for('weekly_lines.submit_picks') }}">
@@ -56,12 +34,12 @@
     </div>
 
     {% if current_user.is_authenticated %}
-      <div style="margin-top:1rem; display:flex; align-items:center; gap:.75rem;">
-        <button class="btn" type="submit">Submit Picks</button>
-        <span id="pick-count" class="muted">0/5 selected</span>
+      <div class="mt-4 flex items-center gap-3">
+        <button class="px-3 py-1.5 border border-gray-300 bg-gray-100 rounded hover:bg-gray-200" type="submit">Submit Picks</button>
+        <span id="pick-count" class="text-sm text-gray-500">0/5 selected</span>
       </div>
     {% else %}
-      <p class="muted" style="margin-top:1rem;">Log in to make picks.</p>
+      <p class="mt-4 text-sm text-gray-500">Log in to make picks.</p>
     {% endif %}
   </form>
 </div>
@@ -79,7 +57,7 @@
   const hiddenTz  = document.getElementById('tz-hidden');
   const formEl    = document.getElementById('picks-form');
 
-  // Robust TZ detection with a fallback (pick a sensible default for your app)
+  // Robust TZ detection with a fallback
   const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
 
@@ -98,20 +76,17 @@
     if (hiddenTz)   hiddenTz.value   = userTZ;
   }
 
-  // ---- New helpers: count "fixed" (already-saved) vs "dynamic" (new) picks ----
   function qAll(sel) {
     return Array.from(gamesEl.querySelectorAll(sel));
   }
 
   function computeFixedPicked() {
-    // Count unique games where a previously-saved pick is STILL checked
     const fixedChecked = qAll('input.pick-box[data-already-picked="1"]:checked');
     const gameIds = new Set(fixedChecked.map(b => b.getAttribute('data-game')));
     return gameIds.size;
   }
 
   function computeDynamicChecked() {
-    // Count unique games picked this session (not previously saved), ignoring disabled
     const dynChecked = qAll('input.pick-box[data-already-picked="0"]:checked:not(:disabled)');
     const gameIds = new Set(dynChecked.map(b => b.getAttribute('data-game')));
     return gameIds.size;
@@ -131,7 +106,6 @@
     const boxes = qAll('input.pick-box[type="checkbox"]');
 
     function enforceLimits(changed) {
-      // One pick per game (mutually exclusive)
       if (changed && changed.checked) {
         const gameId = changed.getAttribute('data-game');
         boxes.forEach(b => {
@@ -141,12 +115,10 @@
         });
       }
 
-      // Prevent exceeding 5 total (fixed + dynamic)
       const fixed = computeFixedPicked();
       const dynamic = computeDynamicChecked();
       const total = fixed + dynamic;
 
-      // Only block if the change came from a non-fixed box
       if (total > 5 && changed && changed.dataset.alreadyPicked === '0') {
         changed.checked = false;
       }
@@ -154,21 +126,15 @@
       updatePickCountUI();
     }
 
-    // Listen on enabled boxes only (disabled ones represent finished games)
     boxes.filter(b => !b.disabled).forEach(b => {
       b.addEventListener('change', () => enforceLimits(b));
     });
 
-    // Initial pass to set counter correctly
     enforceLimits(null);
   }
 
   async function loadWeek(w) {
     statusEl.textContent = 'Loading…';
-
-    const base = "{{ url_for('weekly_lines.weekly_lines_fragment') }}";
-    const params = new URLSearchParams({ week: String(w), tz: userTZ });
-    const url = `${base}?${params.toString()}`;
 
     try {
       const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
@@ -179,8 +145,8 @@
       if (!res.ok) {
         console.error('Fragment error:', res.status, body);
         statusEl.textContent = 'Failed to load week ' + w + '.';
-        // Optional: show a friendly placeholder instead of raw error HTML
-        gamesEl.innerHTML = '<p class="muted">Sorry, couldn’t load games.</p>';
+        // Use Tailwind text classes instead of old .muted
+        gamesEl.innerHTML = '<p class="text-sm text-gray-500">Sorry, couldn’t load games.</p>';
         return;
       }
       gamesEl.innerHTML = body;
@@ -193,15 +159,14 @@
       statusEl.textContent = '';
       updatePagerDisabled();
       updateHiddenContext();
-      attachPickHandlers();     // rebind for the new fragment
-      updatePickCountUI();      // ensure counter reflects fixed picks in fragment
+      attachPickHandlers();
+      updatePickCountUI();
     } catch (e) {
       statusEl.textContent = 'Failed to load week ' + w;
       console.error(e);
     }
   }
 
-  // Optional: block submit if somehow >5 (server still enforces; this is UX sugar)
   if (formEl) {
     formEl.addEventListener('submit', (e) => {
       if (totalSelected() > 5) {
@@ -211,7 +176,6 @@
     });
   }
 
-  // Pager events
   weekEl.addEventListener('change', e => loadWeek(e.target.value));
   document.getElementById('prev')?.addEventListener('click', () => {
     const weeks = getWeekOptions();
@@ -236,12 +200,9 @@
   updatePagerDisabled();
   updatePickCountUI();
 
-  // One-time refresh with browser TZ if the initial page URL lacks ?tz=...
   const qs = new URLSearchParams(window.location.search);
   if (!qs.has('tz')) {
     setTimeout(() => loadWeek(weekEl.value), 0);
   }
-
 </script>
 {% endblock %}
-
