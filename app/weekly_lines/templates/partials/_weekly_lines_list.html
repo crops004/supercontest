@@ -1,20 +1,18 @@
-{% set ats_by_game = ats_by_game|default({}) %}
 {% set disable = disable_inputs|default(false) %}
 
-{# Tailwind-only score badge #}
-{% macro score_badge_for(val, other, is_final) -%}
-  {% if not is_final %}
-    {% if val is not none %}
-      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600" title="In progress">{{ val }}</span>
+{% macro score_badge(final, val, other) -%}
+  {% if not final %}
+    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600" title="In progress">{{ (val is not none) and val or '—' }}</span>
+  {% elif val is not none and other is not none %}
+    {% if val > other %}
+      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-green-100 border-green-200 text-green-800" title="Winner">{{ val }}</span>
+    {% elif val < other %}
+      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-red-100 border-red-200 text-red-800" title="Loser">{{ val }}</span>
     {% else %}
-      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600" title="Not started">—</span>
+      <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-yellow-100 border-yellow-200 text-yellow-800" title="Tie">{{ val }}</span>
     {% endif %}
-  {% elif val > other %}
-    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-green-100 border-green-200 text-green-800" title="Winner">{{ val }}</span>
-  {% elif val < other %}
-    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-red-100 border-red-200 text-red-800" title="Loser">{{ val }}</span>
   {% else %}
-    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-yellow-100 border-yellow-200 text-yellow-800" title="Tie">{{ val }}</span>
+    <span class="inline-block ml-1 px-1.5 rounded text-xs border font-medium bg-gray-100 border-gray-300 text-gray-600">—</span>
   {% endif %}
 {%- endmacro %}
 
@@ -22,81 +20,130 @@
   <p class="text-sm text-gray-500">No games for this week.</p>
 {% else %}
   {% for day_title, times in groups %}
-    <h2 class="my-4 font-bold text-gray-900">{{ day_title }}</h2>
+    {# For date, use first game's kickoff_at in this day #}
+    {% set first_block = times|first %}
+    {% set first_items = first_block[1] if first_block else [] %}
+    {% set first_game  = first_items|first if first_items else None %}
+    {% set first_iso   = first_game.kickoff_at.isoformat() if first_game and first_game.kickoff_at else '' %}
 
-    {% for time_title, items in times %}
-      <h3 class="my-1 font-semibold text-gray-800 text-sm">{{ time_title }}</h3>
+    <!-- Day header (made sticky & decorated in JS) -->
+    <h2 class="font-bold text-gray-900"
+        data-header="day"
+        data-title="{{ day_title }}"
+        data-date-iso="{{ first_iso }}">{{ day_title }}</h2>
 
-      {% for g in items %}
-        {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
-        {% set chosen = picks_by_game.get(g.id) %}
-        {% set already = (chosen is not none) %}
+    <!-- Cards grid (no time group header; time is shown inside each card) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      {% for time_title, items in times %}
+        {% for g in items %}
+          {% set locked   = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+          {% set chosen   = picks_by_game.get(g.id) %}
+          {% set is_final = (g.completed == True) %}
+          {% set is_pk    = (g.spread_home is not none and g.spread_away is not none and g.spread_home == 0 and g.spread_away == 0) %}
+          {% set has_spreads = (g.spread_home is not none and g.spread_away is not none) %}
 
-        {# Final = explicit completed flag if present; else require both final scores #}
-        {% set is_final = (g.completed if g.completed is not none else (g.final_score_home is not none and g.final_score_away is not none)) %}
-
-        <div class="py-2 border-t border-gray-200">
-
-          <!-- Away (top) -->
-          <div class="flex justify-between items-center gap-2">
-            <label class="flex gap-2 items-center flex-1">
-              {% if current_user.is_authenticated and not disable %}
-                <input
-                  class="pick-box"
-                  type="checkbox"
-                  name="picks"
-                  value="{{ g.id }}|{{ g.away_team }}"
-                  data-game="{{ g.id }}"
-                  data-already-picked="{{ 1 if chosen == g.away_team else 0 }}"
-                  {% if locked %}disabled{% endif %}
-                  {% if chosen == g.away_team %}checked{% endif %}
-                />
-              {% endif %}
-              <span class="whitespace-nowrap">
-                {{ g.away_team }}
-                {{ score_badge_for(g.final_score_away, g.final_score_home, is_final) }}
-              </span>
-            </label>
-            <div class="min-w-[2.5rem] text-right">
-              {% if is_pickem(g) %}
-                PK
-              {% else %}
-                {{ g.spread_away|fmt_spread }}
-              {% endif %}
-            </div>
-          </div>
-
-          <!-- Home (bottom) -->
-          <div class="flex justify-between items-center gap-2">
-            <label class="flex gap-2 items-center flex-1">
-              {% if current_user.is_authenticated and not disable %}
-                <input
-                  class="pick-box"
-                  type="checkbox"
-                  name="picks"
-                  value="{{ g.id }}|{{ g.home_team }}"
-                  data-game="{{ g.id }}"
-                  data-already-picked="{{ 1 if chosen == g.home_team else 0 }}"
-                  {% if locked %}disabled{% endif %}
-                  {% if chosen == g.home_team %}checked{% endif %}
-                />
-              {% endif %}
-              <span class="whitespace-nowrap">
-                {{ g.home_team }}
-                {{ score_badge_for(g.final_score_home, g.final_score_away, is_final) }}
-              </span>
-            </label>
-            <div class="min-w-[2.5rem] text-right">
-              {% if is_pickem(g) %}
-                PK
-              {% else %}
-                {{ g.spread_home|fmt_spread }}
+          <article
+            class="group rounded-xl border border-gray-200 bg-white p-3 shadow-sm hover:shadow transition"
+            data-card
+            data-game="{{ g.id }}"
+            data-locked="{{ 1 if locked else 0 }}"
+          >
+            <!-- Top row: kickoff time + lock -->
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs text-gray-500">
+                {{ time_title }}
+              </div>
+              {% if locked %}
+                <div class="flex items-center gap-1 text-rose-600" title="Locked">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M17 8h-1V6a4 4 0 10-8 0v2H7a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2v-8a2 2 0 00-2-2zm-6-2a3 3 0 016 0v2h-6V6z"/>
+                  </svg>
+                  <span class="text-xs font-medium">Locked</span>
+                </div>
               {% endif %}
             </div>
-          </div>
 
-        </div>
+            <!-- Teams stack -->
+            <div class="space-y-3">
+
+              <!-- Away row -->
+              <div class="flex items-center justify-between gap-3" data-team-row data-picked="{{ 1 if chosen == g.away_team else 0 }}">
+                <div class="flex items-center gap-2 min-w-0">
+                  <!-- Placeholder logo -->
+                  <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm select-none">A</div>
+                  <div class="truncate">
+                    <div class="truncate font-medium">{{ g.away_team }}</div>
+                    <div class="text-xs text-gray-500">
+                      {{ score_badge(is_final, g.final_score_away, g.final_score_home) }}
+                    </div>
+                  </div>
+                </div>
+
+                {% set away_disabled = (not has_spreads or locked) %}
+                {% set pressed_away = (chosen == g.away_team and not locked) %}
+                <button
+                  type="button"
+                  class="shrink-0 px-3 py-1 rounded-full border text-sm transition
+                         focus:outline-none focus:ring
+                         {% if away_disabled %} border-gray-200 text-gray-300 cursor-not-allowed {% else %}
+                           {% if pressed_away %} border-blue-600 bg-blue-50 text-blue-700 {% else %} border-gray-300 bg-white hover:bg-gray-50 {% endif %}
+                         {% endif %}"
+                  role="button"
+                  aria-pressed="{{ 'true' if pressed_away else 'false' }}"
+                  aria-label="Select {{ g.away_team }} spread"
+                  data-role="spread-chip"
+                  data-game="{{ g.id }}"
+                  data-team="{{ g.away_team }}"
+                  {% if away_disabled %} data-disabled="1" data-locked-chip="{{ 1 if locked else 0 }}"{% endif %}
+                >
+                  {% if not has_spreads %}<span class="opacity-50">—</span>
+                  {% else %}
+                    {% if is_pk %}PK{% else %}{{ g.spread_away|fmt_spread }}{% endif %}
+                  {% endif %}
+                </button>
+              </div>
+
+              <!-- Home row -->
+              <div class="flex items-center justify-between gap-3" data-team-row data-picked="{{ 1 if chosen == g.home_team else 0 }}">
+                <div class="flex items-center gap-2 min-w-0">
+                  <!-- Placeholder logo -->
+                  <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm select-none">H</div>
+                  <div class="truncate">
+                    <div class="truncate font-medium">{{ g.home_team }}</div>
+                    <div class="text-xs text-gray-500">
+                      {{ score_badge(is_final, g.final_score_home, g.final_score_away) }}
+                    </div>
+                  </div>
+                </div>
+
+                {% set home_disabled = (not has_spreads or locked) %}
+                {% set pressed_home = (chosen == g.home_team and not locked) %}
+                <button
+                  type="button"
+                  class="shrink-0 px-3 py-1 rounded-full border text-sm transition
+                         focus:outline-none focus:ring
+                         {% if home_disabled %} border-gray-200 text-gray-300 cursor-not-allowed {% else %}
+                           {% if pressed_home %} border-blue-600 bg-blue-50 text-blue-700 {% else %} border-gray-300 bg-white hover:bg-gray-50 {% endif %}
+                         {% endif %}"
+                  role="button"
+                  aria-pressed="{{ 'true' if pressed_home else 'false' }}"
+                  aria-label="Select {{ g.home_team }} spread"
+                  data-role="spread-chip"
+                  data-game="{{ g.id }}"
+                  data-team="{{ g.home_team }}"
+                  {% if home_disabled %} data-disabled="1" data-locked-chip="{{ 1 if locked else 0 }}"{% endif %}
+                >
+                  {% if not has_spreads %}<span class="opacity-50">—</span>
+                  {% else %}
+                    {% if is_pk %}PK{% else %}{{ g.spread_home|fmt_spread }}{% endif %}
+                  {% endif %}
+                </button>
+              </div>
+
+            </div>
+          </article>
+        {% endfor %}
       {% endfor %}
-    {% endfor %}
+    </div>
   {% endfor %}
 {% endif %}
