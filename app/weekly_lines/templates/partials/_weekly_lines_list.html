@@ -20,19 +20,18 @@
   <p class="text-sm text-gray-500">No games for this week.</p>
 {% else %}
   {% for day_title, times in groups %}
-    {# For date, use first game's kickoff_at in this day #}
     {% set first_block = times|first %}
     {% set first_items = first_block[1] if first_block else [] %}
     {% set first_game  = first_items|first if first_items else None %}
     {% set first_iso   = first_game.kickoff_at.isoformat() if first_game and first_game.kickoff_at else '' %}
 
-    <!-- Day header (made sticky & decorated in JS) -->
+    <!-- Day header -->
     <h2 class="font-bold text-gray-900"
         data-header="day"
         data-title="{{ day_title }}"
         data-date-iso="{{ first_iso }}">{{ day_title }}</h2>
 
-    <!-- Cards grid (no time group header; time is shown inside each card) -->
+    <!-- Cards grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
       {% for time_title, items in times %}
         {% for g in items %}
@@ -69,8 +68,15 @@
               <!-- Away row -->
               <div class="flex items-center justify-between gap-3" data-team-row data-picked="{{ 1 if chosen == g.away_team else 0 }}">
                 <div class="flex items-center gap-2 min-w-0">
-                  <!-- Placeholder logo -->
-                  <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm select-none">A</div>
+                  <!-- Away logo -->
+                  <div class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center shrink-0">
+                    <img
+                      class="max-w-full max-h-full object-contain"
+                      src="{{ url_for('static', filename='img/teams/' ~ abbr_team(g.away_team)|lower ~ '.svg') }}"
+                      alt="{{ g.away_team }} logo"
+                      loading="lazy" decoding="async"
+                    />
+                  </div>
                   <div class="truncate">
                     <div class="truncate font-medium">{{ g.away_team }}</div>
                     <div class="text-xs text-gray-500">
@@ -106,8 +112,15 @@
               <!-- Home row -->
               <div class="flex items-center justify-between gap-3" data-team-row data-picked="{{ 1 if chosen == g.home_team else 0 }}">
                 <div class="flex items-center gap-2 min-w-0">
-                  <!-- Placeholder logo -->
-                  <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm select-none">H</div>
+                  <!-- Home logo -->
+                  <div class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center shrink-0">
+                    <img
+                      class="max-w-full max-h-full object-contain"
+                      src="{{ url_for('static', filename='img/teams/' ~ abbr_team(g.home_team)|lower ~ '.svg') }}"
+                      alt="{{ g.home_team }} logo"
+                      loading="lazy" decoding="async"
+                    />
+                  </div>
                   <div class="truncate">
                     <div class="truncate font-medium">{{ g.home_team }}</div>
                     <div class="text-xs text-gray-500">

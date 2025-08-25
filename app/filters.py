@@ -28,7 +28,27 @@ def abbr_team(name: Optional[str]) -> str:
     if not name:
         return ""
     n = name.strip()
-    return TEAM_ABBR.get(n, n[:3].upper())
+
+    # 1) exact match (full name or nickname if you add those keys)
+    code = TEAM_ABBR.get(n)
+    if code:
+        return code
+
+    # 2) nickname (last word) -> e.g., "Kansas City Chiefs" -> "Chiefs"
+    last = n.rsplit(" ", 1)[-1]
+    code = TEAM_ABBR.get(last)
+    if code:
+        return code
+
+    # 3) city initials (all words except last/nickname) -> "Kansas City Chiefs" -> "KC"
+    parts = [p for p in n.split() if p]           # split words
+    if len(parts) >= 2:
+        city_initials = "".join(w[0] for w in parts[:-1]).upper()
+        # normalize some common two-word cities where you prefer 2-letter city abbrs
+        return city_initials  # e.g., KC, NY, LA, SF, TB, NE, GB, NO, LV, etc.
+
+    # 4) old fallback
+    return n[:3].upper()
 
 def fmt_spread(value) -> str:
     if value is None:

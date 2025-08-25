@@ -39,6 +39,7 @@ def weekly_lines():
             tzname=tzname,
             picks_by_game={},
             now_utc=datetime.now(timezone.utc),
+            abbr_team=abbr_team,
         )
 
     # Pick week (param or latest published)
@@ -99,6 +100,7 @@ def weekly_lines():
         picks_by_game=picks_by_game,
         now_utc=now_utc,
         ats_by_game=ats_by_game,
+        abbr_team=abbr_team,
     )
 
 
@@ -130,6 +132,7 @@ def weekly_lines_fragment():
                 now_utc=datetime.now(timezone.utc),
                 tzname=tzname,
                 ats_by_game={},
+                abbr_team=abbr_team,
             )
 
     # Locked games for week
@@ -178,6 +181,7 @@ def weekly_lines_fragment():
         selected_week=selected_week,
         tzname=tzname,
         ats_by_game=ats_by_game,
+        abbr_team=abbr_team,
     )
 
 
