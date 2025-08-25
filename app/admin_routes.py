@@ -11,6 +11,7 @@ from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
 from app.services.time_utils import day_key, time_key
+from app.filters import abbr_team
 
 # Services
 from app.services.games_sync import (
@@ -296,9 +297,10 @@ def admin_lines_fragment():
     return render_template(
         "partials/_weekly_lines_list.html",
         groups=groups,
-        picks_by_game={},                  # not needed for preview
+        picks_by_game={},                  # no preselects in admin
         now_utc=datetime.now(timezone.utc),
-        disable_inputs=True,               # tells the partial to hide inputs
+        disable_inputs=True,               # read-only chips
         ats_by_game=ats_by_game,
         tzname=tzname,
+        abbr_team=abbr_team,               # <-- needed for logo src paths
     )
