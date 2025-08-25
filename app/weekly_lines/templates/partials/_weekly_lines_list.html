@@ -89,7 +89,7 @@
                 {% set pressed_away = (chosen == g.away_team and not locked) %}
                 <button
                   type="button"
-                  class="shrink-0 px-3 py-1 rounded-full border text-sm transition
+                  class="shrink-0 w-[4.5rem] text-center py-1 rounded-full border text-sm transition
                          focus:outline-none focus:ring
                          {% if away_disabled %} border-gray-200 text-gray-300 cursor-not-allowed {% else %}
                            {% if pressed_away %} border-blue-600 bg-blue-50 text-blue-700 {% else %} border-gray-300 bg-white hover:bg-gray-50 {% endif %}
@@ -133,7 +133,7 @@
                 {% set pressed_home = (chosen == g.home_team and not locked) %}
                 <button
                   type="button"
-                  class="shrink-0 px-3 py-1 rounded-full border text-sm transition
+                  class="shrink-0 w-[4.5rem] text-center py-1 rounded-full border text-sm transition
                          focus:outline-none focus:ring
                          {% if home_disabled %} border-gray-200 text-gray-300 cursor-not-allowed {% else %}
                            {% if pressed_home %} border-blue-600 bg-blue-50 text-blue-700 {% else %} border-gray-300 bg-white hover:bg-gray-50 {% endif %}

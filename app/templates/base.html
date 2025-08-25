@@ -33,13 +33,14 @@
             {% if current_user.is_authenticated %}
             <div class="flex items-center justify-between">
                 <!-- Account icon w/ robust dropdown (always opens upward) -->
-                <div id="acct-wrap" class="relative inline-block group">
+                <div id="acct-wrap" class="relative inline-block">
                     <button
                         id="acct-btn"
                         type="button"
                         class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300"
                         aria-haspopup="menu"
                         aria-expanded="false"
+                        aria-controls="acct-menu"
                         aria-label="Account menu"
                         style="-webkit-tap-highlight-color: transparent; touch-action: manipulation;"
                     >
@@ -48,16 +49,12 @@
                         </svg>
                     </button>
 
-                    <!-- Menu ABOVE the button on all breakpoints -->
+                    <!-- Menu ABOVE the button on all breakpoints (no hover classes) -->
                     <div
                         id="acct-menu"
-                        class="absolute left-0 bottom-full mb-2 z-[60] hidden min-w-[160px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg
-                            opacity-0 scale-95 pointer-events-none transition ease-out duration-150
-                            /* desktop hover fallback */
-                            group-hover:block group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto
-                            group-focus-within:block group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:pointer-events-auto
-                            /* hover bridge so the menu doesn’t vanish while mousing up */
-                            after:content-[''] after:absolute after:left-[-10px] after:right-[-10px] after:top-full after:h-6"
+                        class="absolute left-0 bottom-full mb-2 z-[1000] hidden min-w-[176px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg
+                            opacity-0 scale-95 transition ease-out duration-150
+                            after:content-[''] after:absolute after:left-[-12px] after:right-[-12px] after:top-full after:h-7"
                         role="menu"
                         tabindex="-1"
                     >
@@ -103,63 +100,65 @@
             const menu = document.getElementById('acct-menu');
             if (!wrap || !btn || !menu) return;
 
-            const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-
             let closeTimer = null;
-            const open = () => {
+            const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+            function show() {
                 clearTimeout(closeTimer);
                 menu.classList.remove('hidden');
-                menu.classList.add('opacity-100','scale-100','pointer-events-auto');
+                // Force a reflow so the transition runs when we change opacity/scale
+                // eslint-disable-next-line no-unused-expressions
+                menu.offsetHeight;
+                menu.classList.remove('opacity-0','scale-95');
+                menu.classList.add('opacity-100','scale-100');
                 btn.setAttribute('aria-expanded','true');
-            };
-            const close = (delay = 140) => {
+            }
+
+            function hide(delay = 120) {
                 clearTimeout(closeTimer);
                 closeTimer = setTimeout(() => {
-                menu.classList.add('hidden');
-                menu.classList.remove('opacity-100','scale-100','pointer-events-auto');
-                btn.setAttribute('aria-expanded','false');
+                menu.classList.add('opacity-0','scale-95');
+                menu.classList.remove('opacity-100','scale-100');
+                // hide after transition
+                setTimeout(() => {
+                    menu.classList.add('hidden');
+                    btn.setAttribute('aria-expanded','false');
+                }, 140);
                 }, delay);
-            };
+            }
 
-            // --- Touch/mobile: tap-to-toggle only (no hover) ---
-            if (isTouch) {
-                btn.addEventListener('click', (e) => {
+            function toggle(e) {
+                e.preventDefault();
                 e.stopPropagation();
-                menu.classList.contains('hidden') ? open() : close(0);
-                });
+                const isHidden = menu.classList.contains('hidden') || menu.classList.contains('opacity-0');
+                isHidden ? show() : hide(0);
+            }
 
-                // Let link taps navigate; close after a short delay so navigation isn't interrupted
-                menu.addEventListener('click', (e) => {
+            // Use pointer events for both touch and mouse consistently
+            btn.addEventListener('pointerdown', toggle);
+
+            // Desktop hover “niceness”: keep open while hovering the wrapper/menu; add a small grace period
+            if (!isCoarse) {
+                wrap.addEventListener('mouseenter', show);
+                wrap.addEventListener('mouseleave', () => hide(160));
+                menu.addEventListener('mouseenter', show);
+                menu.addEventListener('mouseleave', () => hide(160));
+            }
+
+            // Clicks inside menu should navigate normally (don’t preventDefault)
+            menu.addEventListener('click', (e) => {
                 const a = e.target.closest('a');
                 if (a) {
-                    // Do not preventDefault — allow normal navigation
-                    close(0);   // close immediately; navigation proceeds
+                // Let navigation proceed; optionally hide immediately for snappier feel
+                hide(0);
                 }
-                });
+            });
 
-                // Close when tapping outside
-                document.addEventListener('click', (e) => {
-                if (!wrap.contains(e.target)) close(0);
-                }, { passive: true });
-
-            } else {
-                // --- Desktop: hover open with gentle close delay, plus click toggle ---
-                btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                menu.classList.contains('hidden') ? open() : close(0);
-                });
-
-                wrap.addEventListener('mouseenter', open);
-                wrap.addEventListener('mouseleave', () => close(160));
-
-                // Keep open while over menu
-                menu.addEventListener('mouseenter', open);
-                menu.addEventListener('mouseleave', () => close(160));
-
-                // Close on outside click or Escape
-                document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(0); });
-                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(0); });
-            }
+            // Close on outside click or Escape
+            document.addEventListener('pointerdown', (e) => {
+                if (!wrap.contains(e.target)) hide(0);
+            });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(0); });
             })();
 
     // Tailwind toasts
