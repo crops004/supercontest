@@ -17,19 +17,8 @@
             <a href="{{ url_for('standings.standings') }}" class="font-bold hover:text-gray-300">🏈</a>
         </div>
         <div class="space-x-4">
-            {% if current_user.is_authenticated %}
                 <a href="{{ url_for('weekly_lines.weekly_lines') }}" class="hover:text-gray-300">Picks</a>
                 <a href="{{ url_for('standings.standings') }}" class="hover:text-gray-300">Standings</a>
-                
-                {% if current_user.is_admin %}
-                    <a href="{{ url_for('admin.admin_panel') }}" class="text-yellow-400 font-semibold hover:text-yellow-300">Admin</a>
-                {% endif %}
-
-                <a href="{{ url_for('auth.logout') }}" class="hover:text-gray-300">Logout</a>
-            {% else %}
-                <a href="{{ url_for('auth.login') }}" class="hover:text-gray-300">Login</a>
-                <a href="{{ url_for('auth.register') }}" class="hover:text-gray-300">Register</a>
-            {% endif %}
         </div>
     </nav>
 
@@ -39,46 +28,59 @@
     </main>
 
     <!-- Footer -->
-     <footer class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-500 bg-gray-900 backdrop-blur">
-        <div class="mx-auto max-w-5xl px-4 py-2">
+    <footer class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-500 bg-gray-900 backdrop-blur">
+        <div class="mx-auto max-w-5xl px-6 py-2">
             {% if current_user.is_authenticated %}
-                <div class="flex items-center justify-between gap-3">
-                    <!-- Account button -->
-                    <a href="{{ url_for('users.profile') }}"
-                        class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-sm bg-slate-200 hover:bg-slate-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
-                        </svg>
-                        <span>Account</span>
-                    </a>
+            <div class="flex items-center justify-between">
+                <!-- Account icon w/ dropdown -->
+                <div class="relative inline-block group">
+                    <button
+                    type="button"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
+                    </svg>
+                    </button>
 
-                    <!-- Your picks (mobile: label above chips; desktop: inline) -->
-                    <div class="flex-1">
-                        <div class="flex flex-col items-start md:flex-row md:items-center md:justify-end md:gap-2">
-                            <span class="text-[11px] md:text-sm text-slate-500 mb-1 md:mb-0">
-                                Your picks this week:
-                            </span>
-
-                            <div class="flex flex-wrap gap-2">
-                                {% for p in footer_committed_picks or [] %}
-                                    <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
-                                {% endfor %}
-                                {% for _ in range(5 - (footer_committed_picks|length)) %}
-                                    <span class="chip placeholder">—</span>
-                                {% endfor %}
-                            </div>
-                        </div>
+                    <!-- Dropdown w/ animation -->
+                    <div
+                    class="absolute bottom-full mb-2 left-0 min-w-[160px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg z-50
+                            invisible opacity-0 translate-y-1 pointer-events-none
+                            transition ease-out duration-150
+                            group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto
+                            group-focus-within:visible group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto"
+                    role="menu"
+                    tabindex="-1"
+                    >
+                    <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-t-lg" role="menuitem">Profile</a>
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Admin</a>
+                    {% endif %}
+                    <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-b-lg" role="menuitem">Logout</a>
                     </div>
                 </div>
-                {% else %}
-                <div class="flex items-center justify-end gap-2">
-                    <a href="{{ url_for('auth.register') }}" class="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-                        Register
-                    </a>
-                    <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
-                        Log in
-                    </a>
+
+                <!-- Picks block: label above, chips below -->
+                <div class="flex flex-col items-start">
+                    <span class="text-[11px] md:text-sm text-slate-300 mb-1">Your picks this week:</span>
+                    <div class="flex flex-wrap gap-2">
+                    {% for p in footer_committed_picks or [] %}
+                        <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
+                    {% endfor %}
+                    {% for _ in range(5 - (footer_committed_picks|length)) %}
+                        <span class="chip placeholder">—</span>
+                    {% endfor %}
+                    </div>
                 </div>
+            </div>
+            {% else %}
+            <div class="flex items-center justify-end gap-2">
+                <a href="{{ url_for('auth.register') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">Register</a>
+                <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">Log in</a>
+            </div>
             {% endif %}
         </div>
     </footer>
@@ -129,4 +131,4 @@
     </script>
     {% endblock %}
 </body>
-</html> 
+</html>
