@@ -12,13 +12,13 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
     <!-- Navbar -->
-    <nav class="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
+    <nav class="sticky top-0 z-40 bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
         <div>
             <a href="{{ url_for('standings.standings') }}" class="font-bold hover:text-gray-300">🏈</a>
         </div>
         <div class="space-x-4">
             {% if current_user.is_authenticated %}
-                <a href="{{ url_for('main.weekly_lines') }}" class="hover:text-gray-300">Picks</a>
+                <a href="{{ url_for('weekly_lines.weekly_lines') }}" class="hover:text-gray-300">Picks</a>
                 <a href="{{ url_for('standings.standings') }}" class="hover:text-gray-300">Standings</a>
                 
                 {% if current_user.is_admin %}
@@ -34,13 +34,53 @@
     </nav>
 
     <!-- Main content -->
-    <main class="flex-1 container mx-auto p-6">
+    <main class="min-h-[70vh] pb-24">   <!-- pb-24 ensures content isn't hidden under the footer -->
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 text-sm text-center py-3">
-        © {{ now().year }} Supercontest
+     <footer class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-500 bg-gray-900 backdrop-blur">
+        <div class="mx-auto max-w-5xl px-4 py-2">
+            {% if current_user.is_authenticated %}
+                <div class="flex items-center justify-between gap-3">
+                    <!-- Account button -->
+                    <a href="{{ url_for('users.profile') }}"
+                        class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-sm bg-slate-200 hover:bg-slate-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
+                        </svg>
+                        <span>Account</span>
+                    </a>
+
+                    <!-- Your picks (mobile: label above chips; desktop: inline) -->
+                    <div class="flex-1">
+                        <div class="flex flex-col items-start md:flex-row md:items-center md:justify-end md:gap-2">
+                            <span class="text-[11px] md:text-sm text-slate-500 mb-1 md:mb-0">
+                                Your picks this week:
+                            </span>
+
+                            <div class="flex flex-wrap gap-2">
+                                {% for p in footer_committed_picks or [] %}
+                                    <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
+                                {% endfor %}
+                                {% for _ in range(5 - (footer_committed_picks|length)) %}
+                                    <span class="chip placeholder">—</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="flex items-center justify-end gap-2">
+                    <a href="{{ url_for('auth.register') }}" class="rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+                        Register
+                    </a>
+                    <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
+                        Log in
+                    </a>
+                </div>
+            {% endif %}
+        </div>
     </footer>
 
     {% block scripts %}

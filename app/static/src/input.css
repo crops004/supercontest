@@ -1,1 +1,60 @@
 @import "tailwindcss";
+
+/* Your custom components */
+@layer components {
+  /* base chip */
+  .chip {
+    @apply inline-flex items-center rounded-full border px-2 py-1 leading-none font-medium
+           text-[11px] md:text-xs border-slate-200 bg-slate-50 text-slate-500;
+  }
+
+  /* variants (your chip_class returns: win | loss | push | pending) */
+  .chip.win      { @apply bg-green-50  border-green-200  text-green-700; }
+  .chip.loss     { @apply bg-red-50    border-red-200    text-red-700; }
+  .chip.push     { @apply bg-amber-50  border-amber-200  text-amber-800; }
+  .chip.pending  { @apply bg-slate-50  border-slate-200  text-slate-500; }
+  .chip.placeholder { @apply bg-slate-50 border-slate-200 text-slate-400; }
+
+  .score-badge { @apply inline-block ml-1 px-1 rounded text-xs border; }
+  .score-win   { @apply bg-green-50  border-green-200  text-green-700; }
+  .score-push  { @apply bg-amber-50  border-amber-200  text-amber-800; }
+  .score-lose  { @apply bg-red-50    border-red-200    text-red-700; }
+  .score-pending { @apply bg-slate-50 border-slate-200 text-slate-500; }
+}
+
+/* Optional helper if you want a reusable chips container */
+@layer utilities {
+  .chips { @apply mt-2 flex flex-wrap gap-2; }
+}
+
+@theme {
+  --color-background-dark: oklch(0.1 0 20);
+  --color-background-mid: oklch(0.15 0 20);
+  --color-background-light: oklch(0.2 0 20);
+  --color-text-normal: oklch(0.96 0 20);
+  --color-text-muted: oklch(0.76 0 20);
+  --color-border: oklch(0.4 0 20);
+  --color-border-muted: oklch(0.3 0 20);
+  --color-primary: oklch(0.76 0.1 20);
+  --color-secondary: oklch(0.76 0.1 200);
+  --color-danger: oklch(0.7 0.05 30);
+  --color-warning: oklch(0.7 0.05 100);
+  --color-success: oklch(0.7 0.05 160);
+  --color-info: oklch(0.7 0.05 260);
+  --color-light-bg-dark: oklch(0.92 0 20);
+  --color-light-bg-mid: oklch(0.96 0 20);
+  --color-light-bg-light: oklch(1 0 20);
+  --color-light-text-normal: oklch(0.15 0 20);
+  --color-light-text-muted: oklch(0.4 0 20);
+  --color-light-highlight: oklch(1 0 20);
+  --color-light-border: oklch(0.6 0 20);
+  --color-light-border-muted: oklch(0.7 0 20);
+  --color-light-primary: oklch(0.4 0.1 20);
+  --color-light-secondary: oklch(0.4 0.1 200);
+  --color-light-danger: oklch(0.5 0.05 30);
+  --color-light-warning: oklch(0.5 0.05 100);
+  --color-light-success: oklch(0.5 0.05 160);
+  --color-light-info: oklch(0.5 0.05 260);
+  --color-logo: hsl(40.82, 65.99%, 71.18%);
+  --color-logo-dark: hsl(40.82, 65.99%, 36%);
+}

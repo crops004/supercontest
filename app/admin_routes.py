@@ -1,8 +1,8 @@
 # app/admin_routes.py
 from __future__ import annotations
 
-from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for, flash
-from flask_login import login_required, current_user
+from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask_login import login_required
 from datetime import datetime, timezone
 from collections import defaultdict, OrderedDict
 from typing import List, Dict
@@ -12,7 +12,7 @@ from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
 from app.services.time_utils import day_key, time_key
 
-# New, simplified services
+# Services
 from app.services.games_sync import (
     import_all_lines,
     import_all_scores,
@@ -30,9 +30,11 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 @admin_bp.route("/import-lines", methods=["POST"])
 @login_required
 def admin_import_lines():
+    """Pre-season / yearly: import or refresh all lines."""
     res = import_all_lines()
     flash(
-        f"Lines imported: created={res['created']}, updated={res['updated']}, skipped_locked={res['skipped_locked']}.",
+        f"Lines imported: created={res['created']}, updated={res['updated']}, "
+        f"skipped_locked={res['skipped_locked']}.",
         "success",
     )
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
@@ -41,7 +43,7 @@ def admin_import_lines():
 @admin_bp.route("/import-scores", methods=["POST"])
 @login_required
 def admin_import_scores():
-    # Optional ?days_from=1..3 (defaults to 3)
+    """Utility: pull scores over a recent window (defaults 3 days)."""
     days_from = request.args.get("days_from", type=int) or 3
     res = import_all_scores(days_from=days_from)
     flash(
@@ -55,9 +57,10 @@ def admin_import_scores():
 @admin_bp.route("/lock-weeks", methods=["POST"])
 @login_required
 def admin_lock_weeks():
+    """Utility: lock all weeks through the current one (global action)."""
     res = lock_weeks_through_current()
 
-    # Optionally snapshot closing lines for all locked games after locking
+    # Snapshot closing lines for all locked games after locking (idempotent).
     locked_games = Game.query.filter_by(spread_is_locked=True).all()
     for g in locked_games:
         snapshot_closing_lines_for_game(g, line_source="Admin/Lock")
@@ -74,6 +77,7 @@ def admin_lock_weeks():
 @admin_bp.route("/refresh-spreads", methods=["POST"])
 @login_required
 def admin_refresh_spreads():
+    """Utility: refresh spreads on UNLOCKED games only."""
     res = refresh_spreads_unlocked()
     flash(
         f"Spreads refreshed (UNLOCKED only): created={res['created']}, updated={res['updated']}, "
@@ -83,34 +87,71 @@ def admin_refresh_spreads():
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
 
-# ---------- ATS UTILITIES (POST buttons) ----------
+# ---------- WEEKLY CADENCE BUTTONS ----------
 
-@admin_bp.route("/ats/snapshot_locked", methods=["POST"])
+@admin_bp.route("/prep-week", methods=["POST"])
 @login_required
-def admin_ats_snapshot_locked():
-    games = Game.query.filter_by(spread_is_locked=True).all()
+def admin_prep_week():
+    """
+    Tuesday midday:
+      - Lock the selected week (idempotent)
+      - Snapshot closing lines for its locked games (idempotent)
+    """
+    week = request.args.get("week", type=int) or request.form.get("week", type=int)
+    if week is None:
+        flash("No week specified.", "error")
+        return redirect(url_for("admin.admin_panel"))
+
+    games = Game.query.filter(Game.week == week).all()
+
+    locked_now = 0
     for g in games:
-        snapshot_closing_lines_for_game(g, line_source="Admin/Button")
-    db.session.commit()
-    flash(f"ATS closing spreads snapshotted for {len(games)} locked games.", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+        if not getattr(g, "spread_is_locked", False):
+            g.spread_is_locked = True
+            locked_now += 1
 
-
-@admin_bp.route("/ats/backfill", methods=["POST"])
-@login_required
-def admin_ats_backfill():
-    games = Game.query.all()
-    snap = fin = 0
+    snap = 0
     for g in games:
         if getattr(g, "spread_is_locked", False):
-            snapshot_closing_lines_for_game(g, line_source="Admin/Backfill")
+            snapshot_closing_lines_for_game(g, line_source="Admin/PrepWeek")
             snap += 1
+
+    db.session.commit()
+    flash(f"Week {week} prepped — locked {locked_now}, snapshots {snap}.", "success")
+    return redirect(url_for("admin.admin_panel", week=week))
+
+
+@admin_bp.route("/scores-finalize", methods=["POST"])
+@login_required
+def admin_scores_and_finalize_week():
+    """
+    Thu/Sun/Mon nights:
+      - Update scores for recent N days (default 3)
+      - Finalize ATS for games that are FINAL in the selected week
+    """
+    week = request.args.get("week", type=int) or request.form.get("week", type=int)
+    days_from = request.args.get("days_from", type=int) or 3
+    if week is None:
+        flash("No week specified.", "error")
+        return redirect(url_for("admin.admin_panel"))
+
+    # 1) Pull recent scores
+    res_scores = import_all_scores(days_from=days_from)
+
+    # 2) Finalize ATS for finished games in this week
+    games = Game.query.filter(Game.week == week).all()
+    fin = 0
+    for g in games:
         if g.final_score_home is not None and g.final_score_away is not None:
             finalize_ats_for_game(g)
             fin += 1
+
     db.session.commit()
-    flash(f"ATS backfill complete — snapshots={snap}, finalized={fin}", "success")
-    return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
+    flash(
+        f"Week {week}: scores updated (d{days_from}); ATS finalized for {fin} games.",
+        "success",
+    )
+    return redirect(url_for("admin.admin_panel", week=week))
 
 
 # ---------- ADMIN PANEL (GET) ----------
@@ -122,16 +163,14 @@ def admin_panel():
     week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
     weeks: List[int] = [w for (w,) in week_rows] or [0]
 
-    # Use Tuesday-anchored calendar for "current" week
+    # Tuesday-anchored calendar for "current" week
     current_wk = current_week_number()
 
     # Selected week from query param
     selected_week = request.args.get("week", type=int)
     if selected_week is None:
-        # default to current if it’s in weeks, else 0
         selected_week = current_wk if current_wk in weeks else (weeks[-1] if weeks else 0)
     elif selected_week not in weeks:
-        # if param isn’t valid, force to 0
         selected_week = 0
 
     # Pull all picks for the selected week
@@ -259,7 +298,7 @@ def admin_lines_fragment():
         groups=groups,
         picks_by_game={},                  # not needed for preview
         now_utc=datetime.now(timezone.utc),
-        disable_inputs=True,               # ⬅️ tells the partial to hide inputs
+        disable_inputs=True,               # tells the partial to hide inputs
         ats_by_game=ats_by_game,
-        tzname=tzname,                     
+        tzname=tzname,
     )

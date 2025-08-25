@@ -47,7 +47,7 @@
     <span id="status" class="muted"></span>
   </div>
 
-  <form id="picks-form" method="post" action="{{ url_for('main.submit_picks') }}">
+  <form id="picks-form" method="post" action="{{ url_for('weekly_lines.submit_picks') }}">
     <input type="hidden" name="week" id="week-hidden" value="{{ selected_week }}">
     <input type="hidden" name="tz" id="tz-hidden" value="{{ tzname or '' }}">
 
@@ -166,12 +166,12 @@
   async function loadWeek(w) {
     statusEl.textContent = 'Loading…';
 
-    const base = "{{ url_for('main.weekly_lines_fragment') }}";
+    const base = "{{ url_for('weekly_lines.weekly_lines_fragment') }}";
     const params = new URLSearchParams({ week: String(w), tz: userTZ });
     const url = `${base}?${params.toString()}`;
 
     try {
-      const url = "{{ url_for('main.weekly_lines_fragment') }}" +
+      const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
                   "?week=" + encodeURIComponent(w) +
                   "&tz=" + encodeURIComponent(userTZ);
       const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
@@ -187,7 +187,7 @@
       history.replaceState(
         null,
         '',
-        "{{ url_for('main.weekly_lines') }}" +
+        "{{ url_for('weekly_lines.weekly_lines') }}" +
         "?week=" + encodeURIComponent(w) + "&tz=" + encodeURIComponent(userTZ)
       );
       statusEl.textContent = '';

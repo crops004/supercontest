@@ -36,10 +36,32 @@ def fmt_spread(value) -> str:
     v = float(value)
     return str(int(v)) if v.is_integer() else f"{v:.1f}"
 
-# Optional: tiny helpers for chips/classes if you want them centralized
-RESULT_TO_CLASS = {"win":"win","loss":"loss","push":"push","pending":"pending", None:"pending"}
+# ----- Chip helpers -----
+# Map both internal result labels and ATS strings to a canonical class key
+RESULT_TO_CLASS = {
+    "win": "win",
+    "loss": "loss",
+    "push": "push",
+    "pending": "pending",
+    None: "pending",
+    # ATS -> canonical
+    "COVER": "win",
+    "NO_COVER": "loss",
+    "PUSH": "push",
+}
 def chip_class(result: Optional[str]) -> str:
+    """Return 'win' | 'loss' | 'push' | 'pending' for a given result/ATS value."""
     return RESULT_TO_CLASS.get(result, "pending")
+
+def chip_tw(result: Optional[str]) -> str:
+    """Tailwind classes for a chip based on result/ATS value."""
+    palette = {
+        "win":     "border-green-200 bg-green-50 text-green-700",
+        "loss":    "border-red-200 bg-red-50 text-red-700",
+        "push":    "border-amber-200 bg-amber-50 text-amber-800",
+        "pending": "border-slate-200 bg-slate-50 text-slate-500",
+    }
+    return palette.get(chip_class(result), palette["pending"])
 
 # ---- Globals ----
 def is_pickem(game: Game) -> bool:
@@ -56,5 +78,6 @@ def register_template_utils(app):
     app.add_template_filter(abbr_team,  "abbr_team")
     app.add_template_filter(fmt_spread, "fmt_spread")
     app.add_template_filter(chip_class, "chip_class")
+    app.add_template_filter(chip_tw,    "chip_tw")       
     # Globals
     app.add_template_global(is_pickem,  "is_pickem")
