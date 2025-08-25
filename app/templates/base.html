@@ -32,37 +32,38 @@
         <div class="mx-auto max-w-5xl px-6 py-2">
             {% if current_user.is_authenticated %}
             <div class="flex items-center justify-between">
-                <!-- Account icon w/ dropdown (mobile-safe) -->
-                <div class="relative inline-block group" id="acct-wrap">
-                <button
-                    id="acct-btn"
-                    type="button"
-                    class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                    aria-label="Account menu"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
-                    </svg>
-                </button>
+                <!-- Account icon w/ robust dropdown (always opens upward) -->
+                <div id="acct-wrap" class="relative inline-block group">
+                    <button
+                        id="acct-btn"
+                        type="button"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        aria-label="Account menu"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
+                        </svg>
+                    </button>
 
-                <!-- On mobile: show BELOW the button; on >=sm: show ABOVE (so it doesn't hit the screen edge) -->
-                <div
-                    id="acct-menu"
-                    class="absolute left-0 z-[60] hidden min-w-[160px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg
-                        top-full mt-2            <!-- default: mobile -->
-                        sm:top-auto sm:bottom-full sm:mt-0 sm:mb-2  <!-- desktop -->
-                        group-hover:block group-focus-within:block"
-                    role="menu"
-                    tabindex="-1"
-                >
-                    <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-t-lg" role="menuitem">Profile</a>
-                    {% if current_user.is_admin %}
-                    <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Admin</a>
-                    {% endif %}
-                    <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-b-lg" role="menuitem">Logout</a>
-                </div>
+                <!-- Menu ABOVE the button on all breakpoints -->
+                    <div
+                        id="acct-menu"
+                        class="absolute left-0 bottom-full mb-2 z-[60] hidden min-w-[160px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg
+                            opacity-0 scale-95 pointer-events-none transition ease-out duration-150
+                            group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto group-hover:block
+                            group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:pointer-events-auto group-focus-within:block
+                            after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-4"
+                            role="menu"
+                            tabindex="-1"
+                    >
+                        <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-t-lg" role="menuitem">Profile</a>
+                        {% if current_user.is_admin %}
+                            <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Admin</a>
+                        {% endif %}
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-b-lg" role="menuitem">Logout</a>
+                    </div>
                 </div>
 
                 <!-- Picks block: label above, chips below -->
@@ -99,25 +100,40 @@
             const menu = document.getElementById('acct-menu');
             if (!wrap || !btn || !menu) return;
 
-        const open  = () => { menu.classList.remove('hidden'); btn.setAttribute('aria-expanded','true'); };
-        const close = () => { menu.classList.add('hidden');  btn.setAttribute('aria-expanded','false'); };
+            let closeTimer = null;
+            const open  = () => {
+                clearTimeout(closeTimer);
+                menu.classList.remove('hidden');
+                menu.classList.add('opacity-100','scale-100','pointer-events-auto');
+                btn.setAttribute('aria-expanded','true');
+            };
+            const close = (delay = 120) => {
+                clearTimeout(closeTimer);
+                closeTimer = setTimeout(() => {
+                menu.classList.add('hidden');
+                menu.classList.remove('opacity-100','scale-100','pointer-events-auto');
+                btn.setAttribute('aria-expanded','false');
+                }, delay);
+            };
 
-        // Toggle on tap/click
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            menu.classList.contains('hidden') ? open() : close();
-        });
-        // iOS/Safari sometimes prefers touchstart
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // prevents ghost click
-            e.stopPropagation();
-            menu.classList.contains('hidden') ? open() : close();
-        }, { passive: false });
+            // Tap/click toggle (works on phones)
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                menu.classList.contains('hidden') ? open() : close(0);
+            });
 
-        // Close on outside click or Escape
-        document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    })();
+            // Desktop hover with a small grace period
+            wrap.addEventListener('mouseenter', () => open());
+            wrap.addEventListener('mouseleave', () => close(140));
+
+            // Keep open while interacting with menu
+            menu.addEventListener('mouseenter', () => open());
+            menu.addEventListener('mouseleave', () => close(140));
+
+            // Close on outside click or Escape
+            document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(0); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(0); });
+            })();
 
     // Tailwind toasts
     window.renderToasts = (flashes) => {
