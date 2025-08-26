@@ -1,0 +1,56 @@
+<div class="mx-auto max-w-5xl px-6 h-full flex items-center">
+  {% if current_user.is_authenticated %}
+    <div class="flex items-center justify-between w-full">
+      <!-- Account icon / dropdown -->
+      <div id="acct-wrap" class="relative inline-block">
+        <button id="acct-btn" type="button"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-foreground hover:bg-foreground/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-border"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="acct-menu" aria-label="Account menu"
+          style="-webkit-tap-highlight-color: transparent; touch-action: manipulation;">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-copy" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z" />
+          </svg>
+        </button>
+
+        <div id="acct-menu"
+          class="absolute left-0 bottom-full mb-2 z-[1000] hidden min-w-[176px] rounded-lg border border-border bg-background text-copy shadow-lg
+                 opacity-0 scale-95 transition ease-out duration-150
+                 after:content-[''] after:absolute after:left-[-12px] after:right-[-12px] after:top-full after:h-7"
+          role="menu" tabindex="-1">
+          <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-foreground rounded-t-lg" role="menuitem">Profile</a>
+          {% if current_user.is_admin %}
+          <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-foreground" role="menuitem">Admin</a>
+          {% endif %}
+          <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-foreground rounded-b-lg" role="menuitem">Logout</a>
+        </div>
+      </div>
+
+      <!-- Picks block -->
+      <div class="flex flex-col items-start">
+        <span class="text-[11px] md:text-sm text-copy-light mb-1">Your picks this week:</span>
+        <div class="flex flex-wrap gap-2">
+          {% for p in footer_committed_picks or [] %}
+            <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
+          {% endfor %}
+          {% for _ in range(5 - (footer_committed_picks|length)) %}
+            <span class="chip placeholder">—</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="w-full flex justify-center">
+      <div class="flex justify-center gap-6">
+        <a href="{{ url_for('auth.register') }}"
+           class="{% if request.endpoint == 'auth.register' %}text-copy font-semibold underline underline-offset-4{% else %}text-copy-lighter hover:text-copy-light{% endif %}">
+          Register
+        </a>
+        <a href="{{ url_for('auth.login') }}"
+           class="{% if request.endpoint == 'auth.login' %}text-copy font-semibold underline underline-offset-4{% else %}text-copy-lighter hover:text-copy-light{% endif %}">
+          Log in
+        </a>
+      </div>
+    </div>
+  {% endif %}
+</div>

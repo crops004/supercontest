@@ -11,13 +11,26 @@ class User(UserMixin,db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    full_name = db.Column(db.String(120))
-    
+    first_name = db.Column(db.String(80))
+    last_name  = db.Column(db.String(80))
+    entry_paid = db.Column(db.Boolean, default=False)
+    # Notifications
+    notify_lines_posted   = db.Column(db.Boolean, default=True)
+    notify_picks_reminder = db.Column(db.Boolean, default=True)
+    notify_weekly_recap   = db.Column(db.Boolean, default=True)
+
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+    
+    @property
+    def display_full_name(self):
+        # prefer first/last; else username
+        if self.first_name or self.last_name:
+            return (" ".join(p for p in [self.first_name, self.last_name] if p)).strip()
+        return self.username
 
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,7 +42,7 @@ class Game(db.Model):
     spread_home = db.Column(db.Numeric, nullable=True)
     spread_away = db.Column(db.Numeric, nullable=True)
     spread_last_update = db.Column(db.DateTime(timezone=True), nullable=True)
-    odds_event_id = db.Column(db.Text, index=True, nullable=True)
+    odds_event_id = db.Column(db.Text, unique=True, index=True, nullable=True)
     kickoff_at = db.Column(db.DateTime(timezone=True), nullable=True)
     spread_is_locked = db.Column(db.Boolean, default=False)
     spread_locked_at = db.Column(db.DateTime(timezone=True), nullable=True)

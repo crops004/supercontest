@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+
+<div class="min-h-[calc(100vh-120px)] flex items-center justify-center px-4 bg-background">
+  <section
+    class="w-full max-w-md rounded-2xl border border-border bg-foreground shadow-xl shadow-primary/10 ring-1 ring-border/40">
+    <!-- Accent bar -->
+    <div class="h-1 w-full bg-primary rounded-t-2xl"></div>
+
+    <div class="p-6 md:p-7">
+      <h1 class="text-xl font-semibold text-copy">Create account</h1>
+      <p class="mt-1 text-sm text-copy-light">Join the contest and start making picks.</p>
+
+      <form method="POST" class="mt-6 space-y-4" novalidate>
+        <!-- Username -->
+        <div>
+          <label for="username" class="block text-sm text-copy-lighter mb-1">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label for="password" class="block text-sm text-copy-lighter mb-1">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" required
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <!-- Email -->
+        <div>
+          <label for="email" class="block text-sm text-copy-lighter mb-1">Email (optional)</label>
+          <input id="email" name="email" type="email" autocomplete="email"
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <!-- Names -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="first_name" class="block text-sm text-copy-lighter mb-1">First name</label>
+            <input id="first_name" name="first_name" type="text" required
+              class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-primary/40">
+          </div>
+          <div>
+            <label for="last_name" class="block text-sm text-copy-lighter mb-1">Last name</label>
+            <input id="last_name" name="last_name" type="text" required
+              class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                     focus:outline-none focus:ring-2 focus:ring-primary/40">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="pt-2 flex items-center justify-between gap-2">
+          <a href="{{ url_for('auth.login') }}"
+             class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm text-copy">
+            Already have an account? <span class="ml-1 text-primary hover:underline">Sign in</span>
+          </a>
+          <button type="submit"
+            class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2 text-sm font-semibold
+                   shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
+            Create account
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

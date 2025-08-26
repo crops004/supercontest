@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<section class="relative overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-primary via-primary-dark to-secondary opacity-90"></div>
+  <div class="relative max-w-5xl mx-auto px-6 py-14 text-primary-content">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🏆</span>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">About the Supercontest</h1>
+      </div>
+      <!-- Share button -->
+      <button
+        id="shareBtn"
+        class="inline-flex items-center gap-2 rounded-lg bg-foreground/10 px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-foreground/30 hover:bg-foreground/20"
+      >
+        <span>Share</span><span aria-hidden>🔗</span>
+      </button>
+    </div>
+    <p class="text-primary-content/90 max-w-3xl">
+      A season-long NFL contest where you make <strong>5 picks against the spread</strong> each week.
+      Points for wins, half-points for pushes, and glory if you top the leaderboard.
+    </p>
+  </div>
+</section>
+
+<!-- Sticky in-page nav: swipeable chips (no arrows, no JS) -->
+<nav class="sticky top-[56px] z-30 bg-foreground/80 backdrop-blur border-b border-border">
+    <div class="max-w-5xl mx-auto px-0 sm:px-6">
+        <div class="relative sm:static">
+            <ul class="flex gap-2 py-3 px-6 sm:px-0
+               overflow-x-auto sm:overflow-visible
+               snap-x snap-mandatory scroll-px-6 scroll-smooth
+               [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+               touch-pan-x">
+                <li class="snap-start shrink-0">
+                    <a href="#need-to-know"
+                        class="px-3 py-1.5 rounded-full border border-border text-copy hover:bg-foreground whitespace-nowrap">
+                        What to Know
+                    </a>
+                </li>
+                <li class="snap-start shrink-0">
+                    <a href="#during-season"
+                        class="px-3 py-1.5 rounded-full border border-border text-copy hover:bg-foreground whitespace-nowrap">
+                        During the Season
+                    </a>
+                </li>
+                <li class="snap-start shrink-0">
+                    <a href="#entry-payouts"
+                        class="px-3 py-1.5 rounded-full border border-border text-copy hover:bg-foreground whitespace-nowrap">
+                        Entry &amp; Payouts
+                    </a>
+                </li>
+                <li class="snap-start shrink-0">
+                    <a href="#deadlines"
+                        class="px-3 py-1.5 rounded-full border border-border text-copy hover:bg-foreground whitespace-nowrap">
+                        Deadlines
+                    </a>
+                </li>
+                <li class="snap-start shrink-0">
+                    <a href="#faq"
+                        class="px-3 py-1.5 rounded-full border border-border text-copy hover:bg-foreground whitespace-nowrap">
+                        FAQ
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Soft fade edges on mobile -->
+            <div
+                class="pointer-events-none sm:hidden absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-foreground to-foreground/0">
+            </div>
+            <div
+                class="pointer-events-none sm:hidden absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-foreground to-foreground/0">
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="max-w-5xl mx-auto px-6 py-10 space-y-14 text-copy">
+
+  <!-- What You Need to Know -->
+  <section id="need-to-know">
+    <h2 class="text-2xl font-bold mb-6">What You Need to Know</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">🖐️</div>
+        <h3 class="font-semibold mb-1">Five Picks Weekly</h3>
+        <p class="text-copy-light text-sm">Choose <strong>5 teams ATS</strong> for each NFL week.</p>
+      </div>
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">⏱️</div>
+        <h3 class="font-semibold mb-1">Per-Game Locking</h3>
+        <p class="text-copy-light text-sm">Each pick locks at that game’s scheduled kickoff.</p>
+      </div>
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">📊</div>
+        <h3 class="font-semibold mb-1">Fixed Spreads</h3>
+        <p class="text-copy-light text-sm">Lines don’t move once posted for the week.</p>
+      </div>
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">✅</div>
+        <h3 class="font-semibold mb-1">Scoring</h3>
+        <p class="text-copy-light text-sm"><strong>+1</strong> win, <strong>+0.5</strong> push, <strong>0</strong> loss.</p>
+      </div>
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">🏅</div>
+        <h3 class="font-semibold mb-1">Standings</h3>
+        <p class="text-copy-light text-sm">Leaderboard updates weekly after games are final.</p>
+      </div>
+      <div class="rounded-xl border border-border bg-foreground p-5 shadow-sm">
+        <div class="text-2xl mb-2">🧮</div>
+        <h3 class="font-semibold mb-1">Tiebreakers</h3>
+        <p class="text-copy-light text-sm">Season wins, then fewest losses, then last-4-weeks record, then coin flip/split.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- During the Season -->
+  <section id="during-season">
+    <h2 class="text-2xl font-bold mb-6">During the Season</h2>
+    <ol class="relative border-s-2 border-border">
+      <li class="ms-6 pb-8">
+        <span class="absolute -left-[10px] mt-1 h-5 w-5 rounded-full bg-primary"></span>
+        <h3 class="font-semibold">Lines Posted</h3>
+        <p class="text-copy-light text-sm">Weekly lines typically appear on the <em>Lines</em> page by Tuesday evening, Wednesday midday at the latest.</p>
+      </li>
+      <li class="ms-6 pb-8">
+        <span class="absolute -left-[10px] mt-1 h-5 w-5 rounded-full bg-primary-dark"></span>
+        <h3 class="font-semibold">Make / Edit Picks</h3>
+        <p class="text-copy-light text-sm">Edit any pick until that game’s kickoff.</p>
+      </li>
+      <li class="ms-6 pb-8">
+        <span class="absolute -left-[10px] mt-1 h-5 w-5 rounded-full bg-secondary"></span>
+        <h3 class="font-semibold">Watch & Sweat</h3>
+        <p class="text-copy-light text-sm">Follow along on the <em>Standings</em> page.</p>
+      </li>
+      <li class="ms-6">
+        <span class="absolute -left-[10px] mt-1 h-5 w-5 rounded-full bg-secondary-dark"></span>
+        <h3 class="font-semibold">Weekly Update</h3>
+        <p class="text-copy-light text-sm">After all games finalize, standings update and weekly recaps post.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Entry & Payouts -->
+  <section id="entry-payouts">
+    <h2 class="text-2xl font-bold mb-6">Entry & Payouts</h2>
+    <div class="overflow-hidden rounded-xl border border-border bg-foreground shadow-sm">
+      <div class="grid sm:grid-cols-3">
+        <div class="p-5">
+          <h3 class="text-sm font-semibold text-copy-light">Entry</h3>
+          <p class="text-2xl font-bold text-copy">$52</p>
+          <p class="text-copy-lighter text-sm mt-1">$2 of each entry goes to site maintenance.</p>
+        </div>
+        <div class="p-5">
+          <h3 class="text-sm font-semibold text-copy-light">2nd Place</h3>
+          <p class="text-2xl font-bold text-copy">$100</p>
+          <p class="text-copy-lighter text-sm mt-1">Guaranteed second-place payout.</p>
+        </div>
+        <div class="p-5 ">
+          <h3 class="text-sm font-semibold text-copy-light">1st Place</h3>
+          <p class="text-2xl font-bold text-copy">Remainder</p>
+          <p class="text-copy-lighter text-sm mt-1">Everything else goes to first place.</p>
+        </div>
+      </div>
+
+      <div class="border-t border-border p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <p class="text-copy text-sm">Send your entry via Venmo.</p>
+        <a
+          href="https://venmo.com/u/Joe-Cropsey"
+          class="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-primary-content text-sm font-semibold hover:opacity-95"
+          target="_blank" rel="noopener"
+        >
+          Pay on Venmo →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Deadlines & Locking -->
+  <section id="deadlines">
+    <h2 class="text-2xl font-bold mb-6">Deadlines & Locking</h2>
+    <div class="space-y-4">
+      <div class="rounded-xl border border-border p-4 bg-secondary/90">
+        <div class="flex items-start gap-3">
+          <span class="text-xl">🕒</span>
+          <div>
+            <h3 class="font-semibold text-copy">Per-Game Lock</h3>
+            <p class="text-copy text-sm">
+              Each selection locks at the scheduled kickoff of that specific game. You can still edit other picks that haven’t kicked off.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-xl border border-border p-4 bg-primary-light/90">
+        <div class="flex items-start gap-3">
+          <span class="text-xl">💳</span>
+          <div>
+            <h3 class="font-semibold text-copy">Payment Deadline</h3>
+            <p class="text-copy text-sm">
+              Entry fee due by <strong>end of Week 4</strong>. Unpaid entries are <strong>eliminated</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-xl border border-border p-4 bg-secondary-light/90">
+        <div class="flex items-start gap-3">
+          <span class="text-xl">📌</span>
+          <div>
+            <h3 class="font-semibold text-copy">Line Corrections</h3>
+            <p class="text-copy text-sm">
+              Lines are fixed once posted, but obvious data errors may be corrected pre-kickoff.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <h2 class="text-2xl font-bold mb-6">FAQ</h2>
+    <div class="space-y-3">
+      <details class="group rounded-lg border border-border bg-foreground p-4 open:shadow-sm">
+        <summary class="flex cursor-pointer items-center justify-between text-copy">
+          <span class="font-medium">Can I pick both sides of the same game?</span>
+          <span class="transition-transform group-open:rotate-180">⌄</span>
+        </summary>
+        <div class="pt-2 text-copy text-sm">
+          No — each game may only contribute <strong>one side</strong> to your weekly five picks.
+        </div>
+      </details>
+      <details class="group rounded-lg border border-border bg-foreground p-4 open:shadow-sm">
+        <summary class="flex cursor-pointer items-center justify-between text-copy">
+          <span class="font-medium">When do standings update?</span>
+          <span class="transition-transform group-open:rotate-180">⌄</span>
+        </summary>
+        <div class="pt-2 text-copy text-sm">
+          After all games in the scoring window finalize (typically Monday night). Interim updates may appear as scores finalize.
+        </div>
+      </details>
+      <details class="group rounded-lg border border-border bg-foreground p-4 open:shadow-sm">
+        <summary class="flex cursor-pointer items-center justify-between text-copy">
+          <span class="font-medium">How are payouts handled?</span>
+          <span class="transition-transform group-open:rotate-180">⌄</span>
+        </summary>
+        <div class="pt-2 text-copy text-sm">
+          First place gets the remainder of the pool after a $100 second-place prize and $2 per entry site maintenance.
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="border-t border-border pt-8">
+    <div class="rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-primary-content p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <h3 class="text-lg font-semibold">Ready to join the contest?</h3>
+        <p class="text-primary-content/90 text-sm">Create an account and get set to make your first picks.</p>
+      </div>
+      <a
+        href="{{ url_for('auth.register') }}"
+        class="inline-flex items-center justify-center rounded-lg bg-primary-content/10 px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-primary-content/30 hover:bg-primary-content/20"
+      >
+        Register Now →
+      </a>
+    </div>
+  </section>
+
+</div>
+
+<!-- Share logic (no external libs) -->
+<script>
+  (function () {
+    const btn = document.getElementById('shareBtn');
+    if (!btn) return;
+
+    const data = {
+      title: document.title || 'Supercontest',
+      text: 'Join our NFL Supercontest! $52 entry ($2 to site), $100 to 2nd, rest to 1st. Pay by Week 4 or eliminated.',
+      url: window.location.origin + '{{ url_for("standings.standings") }}'
+    };
+
+    btn.addEventListener('click', async () => {
+      if (navigator.share) {
+        try { await navigator.share(data); }
+        catch (e) { /* user canceled */ }
+      } else {
+        try {
+          await navigator.clipboard.writeText(data.url);
+          btn.textContent = 'Link Copied ✓';
+          setTimeout(() => (btn.textContent = 'Share 🔗'), 1500);
+        } catch {
+          window.prompt('Copy this link:', data.url);
+        }
+      }
+    });
+  })();
+</script>
+{% endblock %}

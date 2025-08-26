@@ -6,39 +6,61 @@
 <style>
   /* Tiny helper for a shake on over-limit */
   @keyframes pick-shake {
-    10%, 90% { transform: translateX(-1px); }
-    20%, 80% { transform: translateX(2px); }
-    30%, 50%, 70% { transform: translateX(-4px); }
-    40%, 60% { transform: translateX(4px); }
+
+    10%,
+    90% {
+      transform: translateX(-1px);
+    }
+
+    20%,
+    80% {
+      transform: translateX(2px);
+    }
+
+    30%,
+    50%,
+    70% {
+      transform: translateX(-4px);
+    }
+
+    40%,
+    60% {
+      transform: translateX(4px);
+    }
   }
-  .shake { animation: pick-shake 400ms; }
+
+  .shake {
+    animation: pick-shake 400ms;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-[1100px] mx-auto my-6 px-4">
-  <!-- Week Controls: now sticky under the navbar -->
-  <div id="week-controls"
-       class="sticky z-30 bg-gray-100 border-b border-gray-200"
-       style="top: 0;">
+<div class="max-w-[1100px] mx-auto my-6 px-4 text-copy-light">
+  <!-- Week Controls: sticky under the navbar -->
+  <div id="week-controls" class="sticky z-30 bg-background border-b border-border" style="top: 0;">
     <div class="flex items-center gap-2 py-2">
-      <button id="prev" class="px-2 py-1 border border-gray-300 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default" type="button">‹ Prev</button>
+      <button id="prev"
+        class="px-2 py-1 border border-border bg-background rounded hover:bg-foreground disabled:opacity-50 disabled:cursor-default"
+        type="button">‹ Prev</button>
 
-      <label for="week" class="text-sm text-gray-700">Week:</label>
-      <select id="week" name="week" class="px-2 py-1 border border-gray-300 rounded bg-white text-sm">
+      <label for="week" class="text-sm text-copy-light">Week:</label>
+      <select id="week" name="week" class="px-2 py-1 border border-border rounded bg-foreground text-sm text-copy">
         {% for w in weeks %}
-          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        <option value="{{ w }}" {{ 'selected' if w==selected_week else '' }}>{{ w }}</option>
         {% endfor %}
       </select>
 
-      <button id="next" class="px-2 py-1 border border-gray-300 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default" type="button">Next ›</button>
+      <button id="next"
+        class="px-2 py-1 border border-border bg-background rounded hover:bg-foreground disabled:opacity-50 disabled:cursor-default"
+        type="button">Next ›</button>
 
       <span class="flex-1"></span>
-      <span id="status" class="text-sm text-gray-500"></span>
+      <span id="status" class="text-sm text-copy-lighter"></span>
     </div>
   </div>
 
-  <div class="relative bg-gray-100">
+  <div class="relative bg-background">
     <!-- Form wrapper kept for non-JS fallback -->
     <form id="picks-form" method="post" action="{{ url_for('weekly_lines.submit_picks') }}">
       <input type="hidden" name="week" id="week-hidden" value="{{ selected_week }}">
@@ -51,343 +73,331 @@
       </div>
 
       {% if current_user.is_authenticated %}
-        <div class="mt-4 text-sm text-gray-500 hidden">
-          You’ll see a Submit button after making changes.
-        </div>
+      <div class="mt-4 text-sm text-copy-lighter hidden">
+        You’ll see a Submit button after making changes.
+      </div>
       {% else %}
-        <p class="mt-4 text-sm text-gray-500">Log in to make picks.</p>
+      <p class="mt-4 text-sm text-copy-lighter">Log in to make picks.</p>
       {% endif %}
     </form>
   </div>
 </div>
 
 <!-- Floating Submit (hidden until there are unsaved changes) -->
-<button id="float-submit"
-        class="hidden fixed bottom-5 right-5 z-30 px-4 py-2 rounded-full shadow-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none"
-        type="button">
+<button id="float-submit" class="hidden fixed bottom-5 right-5 z-30 px-4 py-2 rounded-full shadow-lg
+               bg-primary text-primary-content hover:bg-primary-dark focus:outline-none" type="button">
   Submit changes
 </button>
 {% endblock %}
 
 {% block scripts %}
-  {{ super() }}  {# <-- bring in base.html scripts (account menu, toasts, etc.) #}
-  <script>
-    const weekEl     = document.getElementById('week');
-    const gamesEl    = document.getElementById('games');
-    const statusEl   = document.getElementById('status');
-    const prevBtn    = document.getElementById('prev');
-    const nextBtn    = document.getElementById('next');
-    const hiddenWeek = document.getElementById('week-hidden');
-    const hiddenTz   = document.getElementById('tz-hidden');
-    const formEl     = document.getElementById('picks-form');
-    const floatBtn   = document.getElementById('float-submit');
-    const fallbackHidden = document.getElementById('fallback-hidden-inputs');
+{{ super() }}
+<script>
+  const weekEl = document.getElementById('week');
+  const gamesEl = document.getElementById('games');
+  const statusEl = document.getElementById('status');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const hiddenWeek = document.getElementById('week-hidden');
+  const hiddenTz = document.getElementById('tz-hidden');
+  const formEl = document.getElementById('picks-form');
+  const floatBtn = document.getElementById('float-submit');
+  const fallbackHidden = document.getElementById('fallback-hidden-inputs');
 
-    // Sticky pieces
-    const navEl         = document.querySelector('nav');          // your sticky site navbar
-    const weekControls  = document.getElementById('week-controls');
+  // Sticky pieces
+  const navEl = document.querySelector('nav');
+  const weekControls = document.getElementById('week-controls');
 
-    // Robust TZ detection with a fallback
-    const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
+  // Robust TZ detection with a fallback
+  const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
 
-    // Local “dirty” state & client cache
-    let dirty = false;
-    function storageKey(week) { return `pendingPicks:${week}`; }
+  // Local “dirty” state & client cache
+  let dirty = false;
+  function storageKey(week) { return `pendingPicks:${week}`; }
 
-    function getWeekOptions() {
-      return Array.from(weekEl.options).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
-    }
-    function updatePagerDisabled() {
-      const weeks = getWeekOptions();
-      const cur = parseInt(weekEl.value, 10);
-      prevBtn && (prevBtn.disabled = cur <= Math.min(...weeks));
-      nextBtn && (nextBtn.disabled = cur >= Math.max(...weeks));
-    }
-    function updateHiddenContext() {
-      if (hiddenWeek) hiddenWeek.value = String(weekEl.value);
-      if (hiddenTz)   hiddenTz.value   = userTZ;
-    }
+  function getWeekOptions() {
+    return Array.from(weekEl.options).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
+  }
+  function updatePagerDisabled() {
+    const weeks = getWeekOptions();
+    const cur = parseInt(weekEl.value, 10);
+    prevBtn && (prevBtn.disabled = cur <= Math.min(...weeks));
+    nextBtn && (nextBtn.disabled = cur >= Math.max(...weeks));
+  }
+  function updateHiddenContext() {
+    if (hiddenWeek) hiddenWeek.value = String(weekEl.value);
+    if (hiddenTz) hiddenTz.value = userTZ;
+  }
 
-    // ----- Selection model (buttons, not checkboxes) -----
-    function currentWeek() { return parseInt(weekEl.value, 10); }
+  // ----- Selection model -----
+  function currentWeek() { return parseInt(weekEl.value, 10); }
 
-    function collectSelectionsFromUI() {
-      const chips = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]');
-      const picks = [];
-      chips.forEach(ch => {
-        if (ch.closest('[data-locked="1"]')) return; // ignore locked
-        const gid  = ch.getAttribute('data-game');
-        const team = ch.getAttribute('data-team');
-        if (gid && team) picks.push(`${gid}::${team}`);
-      });
-      return picks;
-    }
+  function collectSelectionsFromUI() {
+    const chips = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]');
+    const picks = [];
+    chips.forEach(ch => {
+      if (ch.closest('[data-locked="1"]')) return;
+      const gid = ch.getAttribute('data-game');
+      const team = ch.getAttribute('data-team');
+      if (gid && team) picks.push(`${gid}::${team}`);
+    });
+    return picks;
+  }
 
-    function syncFallbackHiddenInputs() {
-      if (!fallbackHidden) return;
-      fallbackHidden.innerHTML = '';
-      collectSelectionsFromUI().forEach(val => {
-        const [gid, team] = val.split('::');
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'picks';
-        input.value = `${gid}|${team}`;
-        fallbackHidden.appendChild(input);
-      });
-    }
+  function syncFallbackHiddenInputs() {
+    if (!fallbackHidden) return;
+    fallbackHidden.innerHTML = '';
+    collectSelectionsFromUI().forEach(val => {
+      const [gid, team] = val.split('::');
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'picks';
+      input.value = `${gid}|${team}`;
+      fallbackHidden.appendChild(input);
+    });
+  }
 
-    function setDirty(isDirty) {
-      dirty = !!isDirty;
-      floatBtn.classList.toggle('hidden', !dirty);
-    }
+  function setDirty(isDirty) {
+    dirty = !!isDirty;
+    floatBtn.classList.toggle('hidden', !dirty);
+  }
 
-    function computeAlreadyLockedCount() {
-      const savedLocked = gamesEl.querySelectorAll('[data-card][data-locked="1"] [data-team-row][data-picked="1"]');
-      const gameSet = new Set();
-      savedLocked.forEach(el => gameSet.add(el.closest('[data-card]').getAttribute('data-game')));
-      return gameSet.size;
-    }
+  function computeAlreadyLockedCount() {
+    const savedLocked = gamesEl.querySelectorAll('[data-card][data-locked="1"] [data-team-row][data-picked="1"]');
+    const gameSet = new Set();
+    savedLocked.forEach(el => gameSet.add(el.closest('[data-card]').getAttribute('data-game')));
+    return gameSet.size;
+  }
 
-    function currentSelectedCount() {
-      const selected = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]:not([data-locked-chip="1"])');
-      const gameSet = new Set();
-      selected.forEach(ch => gameSet.add(ch.getAttribute('data-game')));
-      return gameSet.size;
-    }
+  function currentSelectedCount() {
+    const selected = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]:not([data-locked-chip="1"])');
+    const gameSet = new Set();
+    selected.forEach(ch => gameSet.add(ch.getAttribute('data-game')));
+    return gameSet.size;
+  }
 
-    function enforcePerGameExclusive(chip) {
-      const gid = chip.getAttribute('data-game');
-      const sibs = gamesEl.querySelectorAll(`[data-role="spread-chip"][data-game="${gid}"]`);
-      sibs.forEach(s => {
-        if (s !== chip) s.setAttribute('aria-pressed', 'false');
-      });
-    }
+  function enforcePerGameExclusive(chip) {
+    const gid = chip.getAttribute('data-game');
+    const sibs = gamesEl.querySelectorAll(`[data-role="spread-chip"][data-game="${gid}"]`);
+    sibs.forEach(s => { if (s !== chip) s.setAttribute('aria-pressed', 'false'); });
+  }
 
-    function tryToggleChip(chip) {
-      if (chip.getAttribute('data-disabled') === '1') return;
+  function tryToggleChip(chip) {
+    if (chip.getAttribute('data-disabled') === '1') return;
 
-      const wasPressed = chip.getAttribute('aria-pressed') === 'true';
-      if (wasPressed) {
-        chip.setAttribute('aria-pressed', 'false');
-        setDirty(true);
-        syncFallbackHiddenInputs();
-        cacheSelections();
-        return;
-      }
-
-      const lockedExisting = computeAlreadyLockedCount();
-      const cap = Math.max(0, 5 - lockedExisting);
-      const before = currentSelectedCount();
-
-      if (before >= cap) {
-        chip.classList.add('shake');
-        setTimeout(() => chip.classList.remove('shake'), 450);
-        statusEl.textContent = `You can only have ${cap} more pick${cap===1?'':'s'} this week.`;
-        return;
-      }
-
-      chip.setAttribute('aria-pressed', 'true');
-      enforcePerGameExclusive(chip);
+    const wasPressed = chip.getAttribute('aria-pressed') === 'true';
+    if (wasPressed) {
+      chip.setAttribute('aria-pressed', 'false');
       setDirty(true);
       syncFallbackHiddenInputs();
       cacheSelections();
+      return;
     }
 
-    function attachChipHandlers() {
-      gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(chip => {
-        chip.addEventListener('click', () => tryToggleChip(chip));
-        chip.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tryToggleChip(chip); }
-        });
+    const lockedExisting = computeAlreadyLockedCount();
+    const cap = Math.max(0, 5 - lockedExisting);
+    const before = currentSelectedCount();
+
+    if (before >= cap) {
+      chip.classList.add('shake');
+      setTimeout(() => chip.classList.remove('shake'), 450);
+      statusEl.textContent = `You can only have ${cap} more pick${cap === 1 ? '' : 's'} this week.`;
+      return;
+    }
+
+    chip.setAttribute('aria-pressed', 'true');
+    enforcePerGameExclusive(chip);
+    setDirty(true);
+    syncFallbackHiddenInputs();
+    cacheSelections();
+  }
+
+  function attachChipHandlers() {
+    gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(chip => {
+      chip.addEventListener('click', () => tryToggleChip(chip));
+      chip.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tryToggleChip(chip); }
       });
-    }
+    });
+  }
 
-    // ----- Sticky offsets: navbar + week controls + day headers -----
-    function measureHeights() {
-      const navH   = navEl?.offsetHeight || 56;
-      const wcH    = weekControls?.offsetHeight || 48; // initial guess; computed after layout
-      const pad    = 0; // keep tight; user asked to reduce spacing
-      return { navH, wcH, pad };
-    }
+  // ----- Sticky offsets: navbar + week controls + day headers -----
+  function measureHeights() {
+    const navH = navEl?.offsetHeight || 56;
+    const wcH = weekControls?.offsetHeight || 48;
+    const pad = 0;
+    return { navH, wcH, pad };
+  }
 
-    function applyStickyOffsets() {
-      const { navH, wcH } = measureHeights();
+  function applyStickyOffsets() {
+    const { navH, wcH } = measureHeights();
 
-      // Week controls stick directly under navbar
-      if (weekControls) weekControls.style.top = `${navH}px`;
+    if (weekControls) weekControls.style.top = `${navH}px`;
 
-      // Day headers stick under week controls (set by adding inline styles in place)
-      const dayTop = navH + wcH; // tight
-      document.querySelectorAll('[data-header="day"]').forEach(h2 => {
-        h2.style.position = 'sticky';
-        h2.style.top = `${dayTop}px`;
-        h2.classList.add('z-20','bg-gray-100','border-b','border-gray-200');
-        // ensure readable padding but tight vertical rhythm
-        h2.classList.add('px-2','py-2','mt-2');
-        // prevent cards showing through
-        h2.style.backgroundColor = 'rgb(243 244 246)'; // solid bg-gray-100
-      });
-    }
+    const dayTop = navH + wcH;
+    document.querySelectorAll('[data-header="day"]').forEach(h2 => {
+      h2.style.position = 'sticky';
+      h2.style.top = `${dayTop}px`;
+      h2.classList.add('z-20', 'bg-background', 'px-2', 'py-2', 'mt-2', 'text-copy-light');
+    });
+  }
 
-    // (1) Format Day headers as "Day (M/D)" using their data attributes and user TZ
-    function decorateDayHeaders() {
-      const headers = document.querySelectorAll('[data-header="day"]');
-      headers.forEach(h => {
-        const title = h.getAttribute('data-title') || h.textContent || '';
-        const iso   = h.getAttribute('data-date-iso') || '';
-        const md    = formatMDFromISO(iso, userTZ);
-        h.textContent = md ? `${title} (${md})` : title;
-      });
-    }
-    function formatMDFromISO(iso, tz) {
-      if (!iso) return '';
-      try {
-        const d = new Date(iso);
-        const mo = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'numeric' }).format(d);
-        const da = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' }).format(d);
-        return `${mo}/${da}`;
-      } catch { return ''; }
-    }
+  // (1) Format Day headers as "Day (M/D)" using their data attributes and user TZ
+  function decorateDayHeaders() {
+    const headers = document.querySelectorAll('[data-header="day"]');
+    headers.forEach(h => {
+      const title = h.getAttribute('data-title') || h.textContent || '';
+      const iso = h.getAttribute('data-date-iso') || '';
+      const md = formatMDFromISO(iso, userTZ);
+      h.textContent = md ? `${title} (${md})` : title;
+    });
+  }
+  function formatMDFromISO(iso, tz) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      const mo = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'numeric' }).format(d);
+      const da = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' }).format(d);
+      return `${mo}/${da}`;
+    } catch { return ''; }
+  }
 
-    // ----- Load fragment -----
-    async function loadWeek(w) {
-      statusEl.textContent = 'Loading…';
-      try {
-        const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
-                    "?week=" + encodeURIComponent(w) +
-                    "&tz=" + encodeURIComponent(userTZ);
-        const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
-        const body = await res.text();
-        if (!res.ok) {
-          gamesEl.innerHTML = '<p class="text-sm text-gray-500">Sorry, couldn’t load games.</p>';
-          statusEl.textContent = 'Failed to load week ' + w + '.';
-          return;
-        }
-        gamesEl.innerHTML = body;
-        history.replaceState(null,'',"{{ url_for('weekly_lines.weekly_lines') }}" +
-          "?week=" + encodeURIComponent(w) + "&tz=" + encodeURIComponent(userTZ));
-        statusEl.textContent = '';
-        updatePagerDisabled();
-        updateHiddenContext();
-        attachChipHandlers();
-
-        // After DOM paints, measure heights and apply sticky offsets
-        requestAnimationFrame(() => {
-          decorateDayHeaders();
-          applyStickyOffsets();
-        });
-
-        restoreSelectionsFromCache();
-        syncFallbackHiddenInputs();
-        setDirty(false);
-      } catch (e) {
-        console.error(e);
-        statusEl.textContent = 'Failed to load week ' + w;
-      }
-    }
-
-    function restoreSelectionsFromCache() {
-      const wk = currentWeek();
-      try {
-        const raw = localStorage.getItem(storageKey(wk));
-        if (!raw) return;
-        const picks = JSON.parse(raw);
-        const set = new Set(picks);
-        gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(ch => {
-          const id = `${ch.getAttribute('data-game')}::${ch.getAttribute('data-team')}`;
-          if (set.has(id) && ch.getAttribute('data-locked-chip')!=='1') {
-            ch.setAttribute('aria-pressed', 'true');
-            enforcePerGameExclusive(ch);
-          }
-        });
-      } catch (_) {}
-    }
-    function cacheSelections() {
-      const wk = currentWeek();
-      localStorage.setItem(storageKey(wk), JSON.stringify(collectSelectionsFromUI()));
-    }
-    function clearCacheForWeek(wk) {
-      localStorage.removeItem(storageKey(wk));
-    }
-
-    // Floating submit → AJAX to /api/picks
-    floatBtn?.addEventListener('click', async () => {
-      const picks = collectSelectionsFromUI();
-      const wk = currentWeek();
-      if (picks.length === 0) {
-        setDirty(false);
+  // ----- Load fragment -----
+  async function loadWeek(w) {
+    statusEl.textContent = 'Loading…';
+    try {
+      const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
+        "?week=" + encodeURIComponent(w) +
+        "&tz=" + encodeURIComponent(userTZ);
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+      const body = await res.text();
+      if (!res.ok) {
+        gamesEl.innerHTML = '<p class="text-sm text-copy-lighter">Sorry, couldn’t load games.</p>';
+        statusEl.textContent = 'Failed to load week ' + w + '.';
         return;
       }
-      statusEl.textContent = 'Saving…';
-      floatBtn.disabled = true;
-      try {
-        const res = await fetch("{{ url_for('weekly_lines.submit_picks_api') }}", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ week: wk, picks })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          statusEl.textContent = data.error || 'Failed to save picks.';
-          floatBtn.disabled = false;
-          return;
-        }
-        statusEl.textContent = `Saved ${data.saved} pick${data.saved===1?'':'s'}.`;
-        setDirty(false);
-        floatBtn.disabled = false;
-        clearCacheForWeek(wk);
-        loadWeek(wk); // refresh to reflect locked status etc
-      } catch (e) {
-        console.error(e);
-        statusEl.textContent = 'Save failed.';
-        floatBtn.disabled = false;
-      }
-    });
-
-    // Pager & initial setup
-    function initAfterRender() {
+      gamesEl.innerHTML = body;
+      history.replaceState(null, '', "{{ url_for('weekly_lines.weekly_lines') }}" +
+        "?week=" + encodeURIComponent(w) + "&tz=" + encodeURIComponent(userTZ));
+      statusEl.textContent = '';
+      updatePagerDisabled();
       updateHiddenContext();
       attachChipHandlers();
 
-      // Initial decorate & sticky offset apply after first paint
       requestAnimationFrame(() => {
         decorateDayHeaders();
         applyStickyOffsets();
       });
 
-      updatePagerDisabled();
       restoreSelectionsFromCache();
       syncFallbackHiddenInputs();
       setDirty(false);
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = 'Failed to load week ' + w;
     }
+  }
 
-    weekEl.addEventListener('change', e => loadWeek(e.target.value));
-    document.getElementById('prev')?.addEventListener('click', () => {
-      const weeks = getWeekOptions();
-      const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
-      if (curIdx > 0) {
-        weekEl.value = String(weeks[curIdx - 1]);
-        loadWeek(weekEl.value);
-      }
-    });
-    document.getElementById('next')?.addEventListener('click', () => {
-      const weeks = getWeekOptions();
-      const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
-      if (curIdx >= 0 && curIdx < weeks.length - 1) {
-        weekEl.value = String(weeks[curIdx + 1]);
-        loadWeek(weekEl.value);
-      }
-    });
+  function restoreSelectionsFromCache() {
+    const wk = currentWeek();
+    try {
+      const raw = localStorage.getItem(storageKey(wk));
+      if (!raw) return;
+      const picks = JSON.parse(raw);
+      const set = new Set(picks);
+      gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(ch => {
+        const id = `${ch.getAttribute('data-game')}::${ch.getAttribute('data-team')}`;
+        if (set.has(id) && ch.getAttribute('data-locked-chip') !== '1') {
+          ch.setAttribute('aria-pressed', 'true');
+          enforcePerGameExclusive(ch);
+        }
+      });
+    } catch (_) { }
+  }
+  function cacheSelections() {
+    const wk = currentWeek();
+    localStorage.setItem(storageKey(wk), JSON.stringify(collectSelectionsFromUI()));
+  }
+  function clearCacheForWeek(wk) {
+    localStorage.removeItem(storageKey(wk));
+  }
 
-    // Reapply offsets on resize (navbar/controls height can change)
-    window.addEventListener('resize', () => {
+  // Floating submit → AJAX
+  floatBtn?.addEventListener('click', async () => {
+    const picks = collectSelectionsFromUI();
+    const wk = currentWeek();
+    if (picks.length === 0) {
+      setDirty(false);
+      return;
+    }
+    statusEl.textContent = 'Saving…';
+    floatBtn.disabled = true;
+    try {
+      const res = await fetch("{{ url_for('weekly_lines.submit_picks_api') }}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ week: wk, picks })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        statusEl.textContent = data.error || 'Failed to save picks.';
+        floatBtn.disabled = false;
+        return;
+      }
+      statusEl.textContent = `Saved ${data.saved} pick${data.saved === 1 ? '' : 's'}.`;
+      setDirty(false);
+      floatBtn.disabled = false;
+      clearCacheForWeek(wk);
+      loadWeek(wk);
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = 'Save failed.';
+      floatBtn.disabled = false;
+    }
+  });
+
+  // Pager & initial setup
+  function initAfterRender() {
+    updateHiddenContext();
+    attachChipHandlers();
+
+    requestAnimationFrame(() => {
       decorateDayHeaders();
       applyStickyOffsets();
-    }, { passive: true });
+    });
 
-    const qs = new URLSearchParams(window.location.search);
-    initAfterRender();
-    if (!qs.has('tz')) setTimeout(() => loadWeek(weekEl.value), 0);
-  </script>
+    updatePagerDisabled();
+    restoreSelectionsFromCache();
+    syncFallbackHiddenInputs();
+    setDirty(false);
+  }
+
+  weekEl.addEventListener('change', e => loadWeek(e.target.value));
+  document.getElementById('prev')?.addEventListener('click', () => {
+    const weeks = getWeekOptions();
+    const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
+    if (curIdx > 0) {
+      weekEl.value = String(weeks[curIdx - 1]);
+      loadWeek(weekEl.value);
+    }
+  });
+  document.getElementById('next')?.addEventListener('click', () => {
+    const weeks = getWeekOptions();
+    const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
+    if (curIdx >= 0 && curIdx < weeks.length - 1) {
+      weekEl.value = String(weeks[curIdx + 1]);
+      loadWeek(weekEl.value);
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    decorateDayHeaders();
+    applyStickyOffsets();
+  }, { passive: true });
+
+  const qs = new URLSearchParams(window.location.search);
+  initAfterRender();
+  if (!qs.has('tz')) setTimeout(() => loadWeek(weekEl.value), 0);
+</script>
 {% endblock %}

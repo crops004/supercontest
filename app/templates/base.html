@@ -1,205 +1,219 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> <!-- no data-theme by default = LIGHT -->
+
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Supercontest{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <title>{% block title %}Supercontest{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Tailwind build -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='dist/output.css') }}">
+  <!-- Apply saved theme BEFORE CSS to avoid flashes -->
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem('theme') || 'light'; // default to light
+        if (pref === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        console.log('[theme:init]', pref);
+      } catch (e) { console.error('[theme:init:error]', e); }
+    })();
+  </script>
 
-    {% block head %}{% endblock %}
+  <!-- Tailwind build -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/output.css') }}">
+
+  {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
-    <!-- Navbar -->
-    <nav class="sticky top-0 z-40 bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
-        <div>
-            <a href="{{ url_for('standings.standings') }}" class="font-bold hover:text-gray-300">🏈</a>
-        </div>
-        <div class="space-x-4">
-                <a href="{{ url_for('weekly_lines.weekly_lines') }}" class="hover:text-gray-300">Lines</a>
-                <a href="{{ url_for('standings.standings') }}" class="hover:text-gray-300">Standings</a>
-        </div>
-    </nav>
 
-    <!-- Main content -->
-    <main class="min-h-[70vh] pb-24">   <!-- pb-24 ensures content isn't hidden under the footer -->
-        {% block content %}{% endblock %}
-    </main>
+<body class="bg-background text-copy min-h-screen flex flex-col">
+  <!-- Navbar -->
+  <nav
+    class="sticky top-0 z-40 bg-foreground text-copy border-b border-border px-6 py-3 flex justify-between items-center"
+    role="navigation" aria-label="Primary">
+    <div>
+      <a href="{{ url_for('main.index') }}" class="font-bold hover:text-copy-light">🏈</a>
+    </div>
 
-    <!-- Footer -->
-    <footer class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-500 bg-gray-900 backdrop-blur">
-        <div class="mx-auto max-w-5xl px-6 py-2">
-            {% if current_user.is_authenticated %}
-            <div class="flex items-center justify-between">
-                <!-- Account icon w/ robust dropdown (always opens upward) -->
-                <div id="acct-wrap" class="relative inline-block">
-                    <button
-                        id="acct-btn"
-                        type="button"
-                        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300"
-                        aria-haspopup="menu"
-                        aria-expanded="false"
-                        aria-controls="acct-menu"
-                        aria-label="Account menu"
-                        style="-webkit-tap-highlight-color: transparent; touch-action: manipulation;"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/>
-                        </svg>
-                    </button>
+    {% set ep = request.endpoint or '' %}
+    <div class="flex items-center space-x-4">
+      <a href="{{ url_for('weekly_lines.weekly_lines') }}"
+        class="{{ 'text-copy font-semibold underline underline-offset-4' if ep.startswith('weekly_lines.') else 'text-copy-lighter hover:text-copy-light' }}">
+        Lines
+      </a>
 
-                    <!-- Menu ABOVE the button on all breakpoints (no hover classes) -->
-                    <div
-                        id="acct-menu"
-                        class="absolute left-0 bottom-full mb-2 z-[1000] hidden min-w-[176px] rounded-lg border border-slate-200 bg-white text-gray-900 shadow-lg
-                            opacity-0 scale-95 transition ease-out duration-150
-                            after:content-[''] after:absolute after:left-[-12px] after:right-[-12px] after:top-full after:h-7"
-                        role="menu"
-                        tabindex="-1"
-                    >
-                        <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-t-lg" role="menuitem">Profile</a>
-                        {% if current_user.is_admin %}
-                            <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Admin</a>
-                        {% endif %}
-                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-gray-100 rounded-b-lg" role="menuitem">Logout</a>
-                    </div>
-                </div>
+      <a href="{{ url_for('standings.standings') }}"
+        class="{{ 'text-copy font-semibold underline underline-offset-4' if ep.startswith('standings.') else 'text-copy-lighter hover:text-copy-light' }}">
+        Standings
+      </a>
 
-                <!-- Picks block: label above, chips below -->
-                <div class="flex flex-col items-start">
-                    <span class="text-[11px] md:text-sm text-slate-300 mb-1">Your picks this week:</span>
-                    <div class="flex flex-wrap gap-2">
-                    {% for p in footer_committed_picks or [] %}
-                        <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
-                    {% endfor %}
-                    {% for _ in range(5 - (footer_committed_picks|length)) %}
-                        <span class="chip placeholder">—</span>
-                    {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% else %}
-            <div class="flex items-center justify-end gap-2">
-                <a href="{{ url_for('auth.register') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">Register</a>
-                <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">Log in</a>
-            </div>
-            {% endif %}
-        </div>
-    </footer>
+      <a href="{{ url_for('main.about') }}"
+        class="{{ 'text-copy font-semibold underline underline-offset-4' if ep == 'main.about' else 'text-copy-lighter hover:text-copy-light' }}">
+        About
+      </a>
 
-    {% block scripts %}
-    <!-- Toast stack -->
-    <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
+      <!-- Small theme toggle -->
+      <button id="themeToggle" class="flex h-8 w-8 items-center justify-center rounded-full
+                     bg-transparent hover:bg-foreground/60
+                     ring-1 ring-border/70 hover:ring-border
+                     transition-colors" type="button" aria-label="Toggle theme">
+        <!-- Sun icon (shown in LIGHT) -->
+        <svg id="iconSun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-copy" fill="currentColor"
+          viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zm10.49 14.32l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM12 5a1 1 0 001-1V2h-2v2a1 1 0 001 1zm7 7a7 7 0 11-14 0 7 7 0 0114 0zm-7 9a1 1 0 00-1 1v2h2v-2a1 1 0 00-1-1zM2 13H0v-2h2a1 1 0 001 1 1 1 0 00-1 1zm22-2h-2a1 1 0 00-1-1 1 1 0 001-1h2v2zM4.96 19.04l-1.8 1.79 1.41 1.41 1.8-1.79-1.41-1.41z" />
+        </svg>
+        <!-- Moon icon (shown in DARK) -->
+        <svg id="iconMoon" xmlns="http://www.w3.org/2000/svg" class="hidden h-5 w-5 text-copy" fill="currentColor"
+          viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
+    </div>
+  </nav>
 
-    <script>
-    // Account dropdown menu
-        (function () {
-            const wrap = document.getElementById('acct-wrap');
-            const btn  = document.getElementById('acct-btn');
-            const menu = document.getElementById('acct-menu');
-            if (!wrap || !btn || !menu) return;
+  <!-- Main content -->
+  <main class="min-h-[70vh] pb-16 md:pb-16">
+    {% block content %}{% endblock %}
+  </main>
 
-            let closeTimer = null;
-            const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  <!-- Footer -->
+  <footer class="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-foreground backdrop-blur h-16 md:h-16"
+    role="contentinfo">
+    {% include "partials/footer.html" %}
+  </footer>
 
-            function show() {
-                clearTimeout(closeTimer);
-                menu.classList.remove('hidden');
-                // Force a reflow so the transition runs when we change opacity/scale
-                // eslint-disable-next-line no-unused-expressions
-                menu.offsetHeight;
-                menu.classList.remove('opacity-0','scale-95');
-                menu.classList.add('opacity-100','scale-100');
-                btn.setAttribute('aria-expanded','true');
-            }
+  {% block scripts %}
+  <!-- Toast stack -->
+  <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
-            function hide(delay = 120) {
-                clearTimeout(closeTimer);
-                closeTimer = setTimeout(() => {
-                menu.classList.add('opacity-0','scale-95');
-                menu.classList.remove('opacity-100','scale-100');
-                // hide after transition
-                setTimeout(() => {
-                    menu.classList.add('hidden');
-                    btn.setAttribute('aria-expanded','false');
-                }, 140);
-                }, delay);
-            }
+  <script>
+    // Account dropdown menu (unchanged)
+    (function () {
+      const wrap = document.getElementById('acct-wrap');
+      const btn = document.getElementById('acct-btn');
+      const menu = document.getElementById('acct-menu');
+      if (!wrap || !btn || !menu) return;
 
-            function toggle(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const isHidden = menu.classList.contains('hidden') || menu.classList.contains('opacity-0');
-                isHidden ? show() : hide(0);
-            }
+      let closeTimer = null;
+      const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
-            // Use pointer events for both touch and mouse consistently
-            btn.addEventListener('pointerdown', toggle);
+      function show() {
+        clearTimeout(closeTimer);
+        menu.classList.remove('hidden');
+        menu.offsetHeight;
+        menu.classList.remove('opacity-0', 'scale-95');
+        menu.classList.add('opacity-100', 'scale-100');
+        btn.setAttribute('aria-expanded', 'true');
+      }
 
-            // Desktop hover “niceness”: keep open while hovering the wrapper/menu; add a small grace period
-            if (!isCoarse) {
-                wrap.addEventListener('mouseenter', show);
-                wrap.addEventListener('mouseleave', () => hide(160));
-                menu.addEventListener('mouseenter', show);
-                menu.addEventListener('mouseleave', () => hide(160));
-            }
+      function hide(delay = 120) {
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(() => {
+          menu.classList.add('opacity-0', 'scale-95');
+          menu.classList.remove('opacity-100', 'scale-100');
+          setTimeout(() => {
+            menu.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+          }, 140);
+        }, delay);
+      }
 
-            // Clicks inside menu should navigate normally (don’t preventDefault)
-            menu.addEventListener('click', (e) => {
-                const a = e.target.closest('a');
-                if (a) {
-                // Let navigation proceed; optionally hide immediately for snappier feel
-                hide(0);
-                }
-            });
+      function toggle(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const isHidden = menu.classList.contains('hidden') || menu.classList.contains('opacity-0');
+        isHidden ? show() : hide(0);
+      }
 
-            // Close on outside click or Escape
-            document.addEventListener('pointerdown', (e) => {
-                if (!wrap.contains(e.target)) hide(0);
-            });
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(0); });
-            })();
+      btn.addEventListener('pointerdown', toggle);
+      if (!isCoarse) {
+        wrap.addEventListener('mouseenter', show);
+        wrap.addEventListener('mouseleave', () => hide(160));
+        menu.addEventListener('mouseenter', show);
+        menu.addEventListener('mouseleave', () => hide(160));
+      }
+      menu.addEventListener('click', (e) => {
+        const a = e.target.closest('a');
+        if (a) hide(0);
+      });
+      document.addEventListener('pointerdown', (e) => {
+        if (!wrap.contains(e.target)) hide(0);
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(0); });
+    })();
 
-    // Tailwind toasts
+    // Theme toggle (adds/removes data-theme="dark")
+    (function () {
+      function apply(mode) {
+        try {
+          if (mode === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.removeAttribute('data-theme'); // back to light
+          }
+          localStorage.setItem('theme', mode);
+          // swap icons if present
+          var sun = document.getElementById('iconSun');
+          var moon = document.getElementById('iconMoon');
+          if (sun && moon) {
+            if (mode === 'dark') { sun.classList.add('hidden'); moon.classList.remove('hidden'); }
+            else { moon.classList.add('hidden'); sun.classList.remove('hidden'); }
+          }
+          console.log('[theme:apply]', mode);
+        } catch (e) { console.error('[theme:apply:error]', e); }
+      }
+
+      // set icons correctly on load
+      apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+
+      // bind with delegation so we never miss the click
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#themeToggle');
+        if (!btn) return;
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        apply(isDark ? 'light' : 'dark');
+      });
+    })();
+
+    // Toasts (palette-aware)
     window.renderToasts = (flashes) => {
-        if (!flashes || !flashes.length) return;
-        const wrap = document.getElementById("toast-wrap");
-        flashes.forEach(([cat, msg]) => {
+      if (!flashes || !flashes.length) return;
+      const wrap = document.getElementById("toast-wrap");
+      flashes.forEach(([cat, msg]) => {
         const el = document.createElement("div");
-        const color =
-            cat === "success" ? "bg-green-600" :
-            cat === "warning" ? "bg-yellow-600" :
-            cat === "error"   ? "bg-red-600" :
-                                "bg-gray-900";
-        el.className = `flex items-start gap-2 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${color} transition-opacity duration-200`;
+        const classes =
+          cat === "success" ? "bg-success text-success-content" :
+            cat === "warning" ? "bg-warning text-warning-content" :
+              cat === "error" ? "bg-error text-error-content" :
+                "bg-foreground text-copy";
+        el.className = `flex items-start gap-2 px-4 py-2 rounded-lg text-sm shadow-lg ${classes} transition-opacity duration-200`;
         el.innerHTML = `
-            <span class="leading-5">${msg}</span>
-            <button class="ml-2 text-lg leading-none opacity-80 hover:opacity-100" aria-label="Close">&times;</button>
+          <span class="leading-5">${msg}</span>
+          <button class="ml-2 text-lg leading-none opacity-80 hover:opacity-100" aria-label="Close">&times;</button>
         `;
         wrap.appendChild(el);
         const close = () => { el.style.opacity = 0; setTimeout(() => el.remove(), 200); };
         el.querySelector("button").addEventListener("click", close);
         setTimeout(close, 4200);
-        });
+      });
     };
-    </script>
+  </script>
 
-    <!-- global flashes -->
-    {# Server -> JSON (not JS) #}
-    {% set flashes = get_flashed_messages(with_categories=True) %}
-    <script id="flashes-data" type="application/json">
+  <!-- global flashes -->
+  {% set flashes = get_flashed_messages(with_categories=True) %}
+  <script id="flashes-data" type="application/json">
     {{ flashes | tojson }}
-    </script>
-
-    {# JS reads JSON and shows toasts #}
-    <script>
+  </script>
+  <script>
     (function () {
-        const raw = document.getElementById('flashes-data')?.textContent || '[]';
-        const flashes = JSON.parse(raw);
-        window.renderToasts(flashes);
+      const raw = document.getElementById('flashes-data')?.textContent || '[]';
+      const flashes = JSON.parse(raw);
+      window.renderToasts(flashes);
     })();
-    </script>
-    {% endblock %}
+  </script>
+  {% endblock %}
 </body>
+
 </html>

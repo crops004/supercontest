@@ -27,11 +27,11 @@ def create_app():
     
     # Blueprints
     from .routes import bp as main_bp; app.register_blueprint(main_bp)
-    from .auth import bp as auth_bp; app.register_blueprint(auth_bp, url_prefix='/auth')
-    from .admin_routes import admin_bp; app.register_blueprint(admin_bp)
+    from app.admin import bp as admin_bp; app.register_blueprint(admin_bp, url_prefix="/admin")
     from app.standings import bp as standings_bp; app.register_blueprint(standings_bp)
     from app.weekly_lines import bp as weekly_lines_bp; app.register_blueprint(weekly_lines_bp)
     from app.users import bp as users_bp; app.register_blueprint(users_bp)
+    from app.auth import bp as auth_bp; app.register_blueprint(auth_bp, url_prefix="/auth")
     
     def _resolve_footer_week():
         # Prefer explicit ?week=; else latest published (locked) week; else None

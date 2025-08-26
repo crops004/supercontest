@@ -4,22 +4,26 @@
 @layer components {
   /* base chip */
   .chip {
-    @apply inline-flex items-center rounded-full border px-2 py-1 leading-none font-medium
-           text-[11px] md:text-xs border-slate-200 bg-slate-50 text-slate-500;
+    @apply inline-flex items-center rounded-lg border px-2 py-1 leading-none font-medium
+           text-[11px] md:text-xs border-border bg-foreground text-copy-light;
   }
 
-  /* variants (your chip_class returns: win | loss | push | pending) */
-  .chip.win      { @apply bg-green-50  border-green-200  text-green-700; }
-  .chip.loss     { @apply bg-red-50    border-red-200    text-red-700; }
-  .chip.push     { @apply bg-amber-50  border-amber-200  text-amber-800; }
-  .chip.pending  { @apply bg-slate-50  border-slate-200  text-slate-500; }
-  .chip.placeholder { @apply bg-slate-50 border-slate-200 text-slate-400; }
+  /* variants (chip_class: win | loss | push | pending | placeholder) */
+  .chip.win         { @apply bg-success/30  border-success  text-copy-light; }
+  .chip.loss        { @apply bg-error/30    border-error    text-copy-light; }
+  .chip.push        { @apply bg-warning/30  border-warning  text-copy-light; }
+  .chip.pending     { @apply bg-foreground  border-border   text-copy-light; }
+  .chip.placeholder { @apply bg-foreground  border-border   text-copy-light; }
 
-  .score-badge { @apply inline-block ml-1 px-1 rounded text-xs border; }
-  .score-win   { @apply bg-green-50  border-green-200  text-green-700; }
-  .score-push  { @apply bg-amber-50  border-amber-200  text-amber-800; }
-  .score-lose  { @apply bg-red-50    border-red-200    text-red-700; }
-  .score-pending { @apply bg-slate-50 border-slate-200 text-slate-500; }
+  /* score badge */
+  .score-badge {
+    @apply inline-block ml-1 px-1.5 rounded text-xs border font-medium
+           border-border bg-foreground text-copy-light;
+  }
+  .score-win     { @apply bg-success/30  border-success  text-copy-light; }
+  .score-push    { @apply bg-warning/30  border-warning  text-copy-light; }
+  .score-lose    { @apply bg-error/30    border-error    text-copy-light; }
+  .score-pending { @apply bg-foreground  border-border   text-copy-light; }
 }
 
 /* Optional helper if you want a reusable chips container */
@@ -27,7 +31,55 @@
   .chips { @apply mt-2 flex flex-wrap gap-2; }
 }
 
+/* Make the `dark:` variant follow data-theme if you ever use `dark:` utilities */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ===== LIGHT THEME (DEFAULT) — applies with NO data-theme attribute ===== */
+/* ========== LIGHT THEME (default) ========== */
 @theme {
+  /* shared brand colors */
+  --color-primary: hsl(262 83% 58%);
+  --color-primary-content: hsl(0 0% 100%);
+  --color-primary-dark: hsl(262 84% 48%);
+  --color-primary-light: hsl(262 83% 68%);
+
+  --color-secondary: hsl(42 83% 58%);
+  --color-secondary-content: hsl(42 85% 8%);
+  --color-secondary-dark: hsl(42 84% 48%);
+  --color-secondary-light: hsl(42 83% 68%);
+
+  /* LIGHT surface + text */
+  --color-background: hsl(260 10% 94%);
+  --color-foreground: hsl(240 14% 99%);
+  --color-border: hsl(260 9% 87%);
+
+  --color-copy: hsl(263 11% 15%);
+  --color-copy-light: hsl(261 10% 40%);
+  --color-copy-lighter: hsl(261 10% 55%);
+
+  /* status */
+  --color-success: hsl(120 83% 58%);
+  --color-warning: hsl(60 83% 58%);
+  --color-error: hsl(0 83% 58%);
+
+  --color-success-content: hsl(120 85% 8%);
+  --color-warning-content: hsl(60 85% 8%);
+  --color-error-content: hsl(0 0% 100%);
+}
+
+/* ========== DARK OVERRIDES ========== */
+:where([data-theme="dark"], [data-theme="dark"] *) {
+  /* only the six that change */
+  --color-background: hsl(264 10% 10%);
+  --color-foreground: hsl(263 11% 15%);
+  --color-border: hsl(263 10% 25%);
+
+  --color-copy: hsl(240 14% 99%);
+  --color-copy-light: hsl(262 11% 85%);
+  --color-copy-lighter: hsl(260 10% 65%);
+}
+
+/* @theme {
   --color-background-dark: oklch(0.1 0 20);
   --color-background-mid: oklch(0.15 0 20);
   --color-background-light: oklch(0.2 0 20);
@@ -57,4 +109,4 @@
   --color-light-info: oklch(0.5 0.05 260);
   --color-logo: hsl(40.82, 65.99%, 71.18%);
   --color-logo-dark: hsl(40.82, 65.99%, 36%);
-}
+} */

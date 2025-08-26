@@ -59,7 +59,13 @@ def visible_weeks():
     return [w for (w,) in rows]
 
 # --- ROUTES ---
-@bp.route('/')
-def root():
-    return redirect(url_for("standings.standings"))
+@bp.route("/")
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for("weekly_lines.weekly_lines"))
+    else:
+        return redirect(url_for("main.about"))
 
+@bp.route("/about")
+def about():
+    return render_template("about.html")

@@ -23,12 +23,12 @@ from app.services.games_sync import (
 from app.services.week import current_week_number
 from app.services.ats import snapshot_closing_lines_for_game, finalize_ats_for_game
 
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+from . import bp  # Blueprint defined in __init__.py
 
 
 # ---------- LINES & SCORES (POST buttons) ----------
 
-@admin_bp.route("/import-lines", methods=["POST"])
+@bp.route("/import-lines", methods=["POST"])
 @login_required
 def admin_import_lines():
     """Pre-season / yearly: import or refresh all lines."""
@@ -41,7 +41,7 @@ def admin_import_lines():
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
 
-@admin_bp.route("/import-scores", methods=["POST"])
+@bp.route("/import-scores", methods=["POST"])
 @login_required
 def admin_import_scores():
     """Utility: pull scores over a recent window (defaults 3 days)."""
@@ -55,7 +55,7 @@ def admin_import_scores():
     return redirect(url_for("admin.admin_panel", week=request.args.get("week", type=int)))
 
 
-@admin_bp.route("/lock-weeks", methods=["POST"])
+@bp.route("/lock-weeks", methods=["POST"])
 @login_required
 def admin_lock_weeks():
     """Utility: lock all weeks through the current one (global action)."""
@@ -75,7 +75,7 @@ def admin_lock_weeks():
     return redirect(url_for("admin.admin_panel", week=res.get("week_now")))
 
 
-@admin_bp.route("/refresh-spreads", methods=["POST"])
+@bp.route("/refresh-spreads", methods=["POST"])
 @login_required
 def admin_refresh_spreads():
     """Utility: refresh spreads on UNLOCKED games only."""
@@ -90,7 +90,7 @@ def admin_refresh_spreads():
 
 # ---------- WEEKLY CADENCE BUTTONS ----------
 
-@admin_bp.route("/prep-week", methods=["POST"])
+@bp.route("/prep-week", methods=["POST"])
 @login_required
 def admin_prep_week():
     """
@@ -122,7 +122,7 @@ def admin_prep_week():
     return redirect(url_for("admin.admin_panel", week=week))
 
 
-@admin_bp.route("/scores-finalize", methods=["POST"])
+@bp.route("/scores-finalize", methods=["POST"])
 @login_required
 def admin_scores_and_finalize_week():
     """
@@ -157,7 +157,7 @@ def admin_scores_and_finalize_week():
 
 # ---------- ADMIN PANEL (GET) ----------
 
-@admin_bp.route("/panel", methods=["GET"])
+@bp.route("/panel", methods=["GET"])
 @login_required
 def admin_panel():
     # Week options
@@ -262,7 +262,7 @@ def admin_panel():
 
 # ---------- READ-ONLY LINES FRAGMENT (GET) ----------
 
-@admin_bp.route("/lines/fragment")
+@bp.route("/lines/fragment")
 @login_required
 def admin_lines_fragment():
     """Admin-only preview of lines for ANY week (ignores locking)."""

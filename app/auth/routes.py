@@ -3,8 +3,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from app.extensions import db
 from app.models import User
 from urllib.parse import urlparse, urljoin
-
-bp = Blueprint('auth', __name__)
+from . import bp
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -30,12 +29,12 @@ def register():
 
         first = request.form.get('first_name','').strip()
         last  = request.form.get('last_name','').strip()
-        full_name = f"{first} {last}".strip()
         
         u = User()
         u.username = username
         u.email = email or None
-        u.full_name = full_name
+        u.first_name = first
+        u.last_name = last
         u.set_password(password)  # sets password_hash
         db.session.add(u)
         db.session.commit()
@@ -68,20 +67,64 @@ def login():
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=remember)
-        flash("Logged in!", 'auth_success')
 
         next_url = request.args.get('next')
         if next_url and _is_safe_next_url(next_url):
             return redirect(next_url)
         # Fallback to standings (or "/" if you mapped standings to root)
-        return redirect(url_for('standings.standings'))
+        return redirect(url_for('weekly_lines.weekly_lines'))
 
     return render_template('auth_login.html')
 
+@bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new     = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
 
-@bp.route('/logout')
+        errors = []
+
+        # Verify current password
+        try:
+            ok = current_user.check_password(current)  # if you added the helper above
+        except AttributeError:
+            from werkzeug.security import check_password_hash
+            ok = check_password_hash(current_user.password_hash, current)  # adjust field name if needed
+
+        if not ok:
+            errors.append("Your current password is incorrect.")
+
+        # Basic strength checks (tweak as you like)
+        # if len(new) < 8:
+        #     errors.append("New password must be at least 8 characters.")
+        # if new.lower() == current.lower():
+        #     errors.append("New password must be different from the current one.")
+        if new != confirm:
+            errors.append("New password and confirmation do not match.")
+
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return render_template("change_password.html")
+
+        # Save the new password
+        try:
+            current_user.set_password(new)
+        except AttributeError:
+            from werkzeug.security import generate_password_hash
+            current_user.password_hash = generate_password_hash(new)
+
+        db.session.commit()
+
+        # Optional: log the user out to invalidate other sessions
+        return redirect(url_for("users.profile"))
+
+    return render_template("change_password.html")
+
+@bp.route('/logout', endpoint="logout")
 @login_required
 def logout():
     logout_user()
-    flash("Logged out.", 'auth')
-    return redirect(url_for("standings.standings"))
+    return redirect(url_for("main.about"))

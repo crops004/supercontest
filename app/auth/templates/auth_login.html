@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+
+<div class="min-h-[calc(100vh-120px)] flex items-center justify-center px-4 bg-background">
+  <section
+    class="w-full max-w-md rounded-2xl border border-border bg-foreground shadow-xl shadow-secondary/10 ring-1 ring-border/40">
+    <!-- Accent bar (secondary to differentiate) -->
+    <div class="h-1 w-full bg-secondary rounded-t-2xl"></div>
+
+    <div class="p-6 md:p-7">
+      <h1 class="text-xl font-semibold text-copy">Sign in</h1>
+      <p class="mt-1 text-sm text-copy-light">Welcome back.</p>
+
+      <form method="POST" class="mt-6 space-y-4" novalidate>
+        <!-- Username -->
+        <div>
+          <label for="username" class="block text-sm text-copy-lighter mb-1">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required autofocus
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label for="password" class="block text-sm text-copy-lighter mb-1">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <!-- Remember + Actions -->
+        <div class="flex items-center justify-between pt-2">
+          <label class="inline-flex items-center text-sm text-copy-light">
+            <input type="checkbox" name="remember"
+                   class="h-4 w-4 rounded border-border bg-background text-primary accent-primary
+                          focus:outline-none focus:ring-2 focus:ring-primary/40">
+            <span class="ml-2 select-none">Remember me</span>
+          </label>
+
+          <div class="flex gap-2">
+            <a href="{{ url_for('auth.register') }}"
+               class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm">
+              <span class="text-copy">Create account</span>
+            </a>
+            <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2 text-sm font-semibold
+                     shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
+              Sign in
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
