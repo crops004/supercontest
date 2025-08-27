@@ -60,6 +60,12 @@
     </div>
   </div>
 
+  {% if all_locked is defined and not all_locked %}
+    <div class="mb-3 text-sm text-copy-lighter">
+      Spreads for Week {{ selected_week }} aren’t locked yet. You can browse the matchups; spreads will appear once they’re locked.
+    </div>
+  {% endif %}
+
   <div class="relative bg-background">
     <!-- Form wrapper kept for non-JS fallback -->
     <form id="picks-form" method="post" action="{{ url_for('weekly_lines.submit_picks') }}">

@@ -1,4 +1,5 @@
 {% set disable = disable_inputs|default(false) %}
+{% set show_spreads = all_locked|default(false) %}
 
 {# ===================== ATS-colored score badge ===================== #}
 {# Displays the numeric score but colors by ATS result: 'W'|'L'|'P'|None #}
@@ -34,10 +35,14 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
       {% for time_title, items in times %}
         {% for g in items %}
-          {% set locked     = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
-          {% set chosen     = picks_by_game.get(g.id) %}
-          {% set is_pk      = (g.spread_home is not none and g.spread_away is not none and g.spread_home == 0 and g.spread_away == 0) %}
-          {% set has_spread = (g.spread_home is not none and g.spread_away is not none) %}
+          {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+          {% set chosen = picks_by_game.get(g.id) %}
+
+          {# --- spread visibility & pk logic --- #}
+          {% set has_spread_actual = (g.spread_home is not none and g.spread_away is not none) %}
+          {% set is_pk             = (has_spread_actual and g.spread_home == 0 and g.spread_away == 0) %}
+          {# Only show spreads when the ENTIRE WEEK is locked #}
+          {% set has_spread        = (has_spread_actual and show_spreads) %}
 
           {# ATS per side from server (may already be W/L/P). Normalize if needed. #}
           {% set result_away = ats_resolved.get((g.id, 'away')) %}
@@ -70,7 +75,7 @@
 
               {# -------------------- AWAY -------------------- #}
               {% set picked_away   = (chosen == g.away_team) %}
-              {% set away_disabled = (not has_spread or locked) %}
+              {% set away_disabled = (disable or not has_spread or locked) %}
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_away else 0 }}">
@@ -117,7 +122,7 @@
 
               {# -------------------- HOME -------------------- #}
               {% set picked_home   = (chosen == g.home_team) %}
-              {% set home_disabled = (not has_spread or locked) %}
+              {% set home_disabled = (disable or not has_spread or locked) %}
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_home else 0 }}">

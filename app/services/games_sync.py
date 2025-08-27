@@ -6,16 +6,19 @@ from app.extensions import db
 from app.models import Game
 from app.services.odds_client import parse_iso_z, fetch_odds, fetch_scores
 from app.services.week import week_for_kickoff, current_week_number
+from datetime import datetime, timezone
 
-
-DEFAULT_SPORT_KEYS = (
-    "americanfootball_nfl",
-    "americanfootball_nfl_preseason",
-)
 
 # -------------------------------------------------------------------
 # HELPERS
 # -------------------------------------------------------------------
+
+DEFAULT_SPORT_KEYS = (
+    "americanfootball_nfl",   # regular season only
+)
+
+REGULAR_MIN_WEEK = 1
+
 def _is_locked(game: Game) -> bool:
     return bool(getattr(game, "spread_is_locked", False))
 
@@ -44,7 +47,10 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     Create or update a Game from an Odds API event payload.
     - Honors locking for spread fields (other metadata can still update).
     - If force_week is provided, assigns Week explicitly (our Tuesday-anchored week).
+    - Updates spread_last_update ONLY when the spread value changes.
     """
+    from datetime import datetime, timezone  # local import to avoid file-level changes
+
     ext_id = event.get("id")
     kickoff_at = parse_iso_z(event["commence_time"])
     home = event["home_team"]
@@ -70,12 +76,22 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     if not _is_locked(game):
         home_spread = _extract_home_spread_from_event(event)
         if home_spread is not None:
-            game.spread_home = Decimal(str(home_spread))
-            if hasattr(game, "spread_away"):
-                game.spread_away = Decimal(str(-home_spread))
+            new_home = Decimal(str(home_spread))
+            prev_home = getattr(game, "spread_home", None)
+
+            # Only touch fields/timestamp if the value actually changed
+            if prev_home != new_home:
+                game.spread_home = new_home
+                if hasattr(game, "spread_away"):
+                    game.spread_away = Decimal(str(-home_spread))
+
+                # Option A: update timestamp ONLY when spread changes
+                if hasattr(game, "spread_last_update"):
+                    game.spread_last_update = datetime.now(timezone.utc)
 
     db.session.add(game)
     return game
+
 
 
 def update_game_scores_from_score_event(game: Game, score_ev: Dict[str, Any]) -> bool:
@@ -157,11 +173,6 @@ def update_game_scores_from_score_event(game: Game, score_ev: Dict[str, Any]) ->
 # Sync methods
 # -------------------------------------------------------------------
 def import_all_lines(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS) -> Dict[str, int]:
-    """
-    Fetch odds for preseason + regular, compute week via Tuesday-anchored calendar,
-    and upsert Games. Skips spread updates for locked games.
-    Returns counters for reporting.
-    """
     created = updated = skipped_locked = 0
 
     for key in sport_keys:
@@ -170,6 +181,10 @@ def import_all_lines(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS) -> Dic
             try:
                 kickoff = parse_iso_z(ev.get("commence_time"))
                 week = week_for_kickoff(kickoff)
+
+                # ⛔ skip preseason
+                if week is not None and week < REGULAR_MIN_WEEK:
+                    continue
 
                 existing: Game | None = Game.query.filter_by(odds_event_id=ev.get("id")).one_or_none()
                 if existing and _is_locked(existing):
@@ -190,10 +205,6 @@ def import_all_lines(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS) -> Dic
     return {"created": created, "updated": updated, "skipped_locked": skipped_locked}
 
 def import_all_scores(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS, days_from: int = 3) -> Dict[str, int]:
-    """
-    Pull scores for preseason + regular. Match on odds_event_id.
-    Overwrite scores if different; no-op if unchanged.
-    """
     updated_scores = missing_game = unchanged = 0
 
     for key in sport_keys:
@@ -204,10 +215,24 @@ def import_all_scores(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS, days_
                 if not event_id:
                     continue
 
+                # If the payload includes commence_time, compute week and skip preseason
+                kickoff_raw = ev.get("commence_time")
+                if kickoff_raw:
+                    try:
+                        week = week_for_kickoff(parse_iso_z(kickoff_raw))
+                        if week is not None and week < REGULAR_MIN_WEEK:
+                            continue  # ⛔ preseason scores ignored
+                    except Exception:
+                        pass  # fall through and check DB game
+
                 game: Game | None = Game.query.filter_by(odds_event_id=event_id).one_or_none()
                 if not game:
                     missing_game += 1
                     continue
+
+                # If somehow a preseason game exists, ignore it
+                if (getattr(game, "week", None) is not None) and game.week < REGULAR_MIN_WEEK:
+                    continue  # ⛔ do not write scores to preseason rows
 
                 if update_game_scores_from_score_event(game, ev):
                     updated_scores += 1
@@ -224,16 +249,15 @@ def import_all_scores(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS, days_
 # -------------------------------------------------------------------
 #  Lock weeks (this week and all previous)
 # -------------------------------------------------------------------
-def lock_weeks_through_current(*, include_preseason: bool = True) -> dict:
+def lock_weeks_through_current(*, include_preseason: bool = False) -> dict:
     """
-    Based on Tuesday-anchored week, lock spreads for all games with week <= current week.
+    Lock spreads for all games with week <= current week (regular season by default).
     """
     wk_now = current_week_number()
-    # Only bail if we’re literally before preseason
     if wk_now < 0:
         return {"locked": 0, "week_now": wk_now}
 
-    min_week = 0 if include_preseason else 1
+    min_week = 0 if include_preseason else REGULAR_MIN_WEEK
 
     q = Game.query.filter(
         Game.week.between(min_week, wk_now),
@@ -256,10 +280,6 @@ def lock_weeks_through_current(*, include_preseason: bool = True) -> dict:
 #  Update spreads ONLY for UNLOCKED games
 # -------------------------------------------------------------------
 def refresh_spreads_unlocked(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS) -> Dict[str, int]:
-    """
-    Re-fetch odds and update spreads ONLY for games that are not locked.
-    Creates the game if missing; skips if locked.
-    """
     created = updated = skipped_locked = 0
 
     for key in sport_keys:
@@ -269,6 +289,10 @@ def refresh_spreads_unlocked(*, sport_keys: Tuple[str, ...] = DEFAULT_SPORT_KEYS
                 event_id = ev.get("id")
                 kickoff = parse_iso_z(ev.get("commence_time"))
                 week = week_for_kickoff(kickoff)
+
+                # ⛔ skip preseason
+                if week is not None and week < REGULAR_MIN_WEEK:
+                    continue
 
                 existing: Game | None = Game.query.filter_by(odds_event_id=event_id).one_or_none()
                 if existing and _is_locked(existing):

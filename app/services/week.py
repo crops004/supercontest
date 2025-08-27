@@ -19,24 +19,34 @@ def _week1_start_dt() -> datetime:
 def week_for_kickoff(commence_time: str | datetime) -> int:
     """
     Given kickoff time (ISO string or datetime), return contest week.
-      - Week 0 if before Week 1 Tuesday 00:00 Denver
-      - Week N otherwise
+      - Anything before Week 1 Tuesday 00:00 (Denver) is treated as Week 1
+      - Otherwise compute week in 7-day buckets starting at Week 1 Tuesday
     """
     kickoff_at = (
         parse_iso_z(commence_time) if isinstance(commence_time, str) else commence_time
     ).astimezone(DENVER)
 
     start_dt = _week1_start_dt()
+
+    # Clamp: before Week 1 start => Week 1
     if kickoff_at < start_dt:
-        return 0
+        return 1
+
     days = (kickoff_at.date() - start_dt.date()).days
-    return (days // 7) + 1
+    # Week index is 0-based from start_dt; add 1 for human week number
+    return max(1, (days // 7) + 1)
 
 def current_week_number(now: datetime | None = None) -> int:
-    """Return current contest week based on Denver local time."""
+    """
+    Return current contest week based on Denver local time.
+      - Anything before Week 1 Tuesday 00:00 (Denver) is treated as Week 1
+    """
     now_d = (now or datetime.now(DENVER)).astimezone(DENVER)
     start_dt = _week1_start_dt()
+
+    # Clamp: before Week 1 start => Week 1
     if now_d < start_dt:
-        return 0
+        return 1
+
     days = (now_d.date() - start_dt.date()).days
-    return (days // 7) + 1
+    return max(1, (days // 7) + 1)
