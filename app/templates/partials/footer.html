@@ -19,25 +19,38 @@
           role="menu" tabindex="-1">
           <a href="{{ url_for('users.profile') }}" class="block px-4 py-2 text-sm hover:bg-foreground rounded-t-lg" role="menuitem">Profile</a>
           {% if current_user.is_admin %}
-          <a href="{{ url_for('admin.admin_panel') }}" class="block px-4 py-2 text-sm hover:bg-foreground" role="menuitem">Admin</a>
+          <a href="{{ url_for('admin.index') }}" class="block px-4 py-2 text-sm hover:bg-foreground" role="menuitem">Admin</a>
           {% endif %}
           <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm hover:bg-foreground rounded-b-lg" role="menuitem">Logout</a>
         </div>
       </div>
 
-      <!-- Picks block -->
-      <div class="flex flex-col items-start">
-        <span class="text-[11px] md:text-sm text-copy-light mb-1">Your picks this week:</span>
-        <div class="flex flex-wrap gap-2">
-          {% for p in footer_committed_picks or [] %}
-            <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
-          {% endfor %}
-          {% for _ in range(5 - (footer_committed_picks|length)) %}
-            <span class="chip placeholder">—</span>
-          {% endfor %}
+      <!-- Picks (always visible) + overlay submit button -->
+      <div id="footer-wrap" class="relative inline-block">
+        <!-- Always-visible footer content -->
+        <div class="flex flex-col items-start">
+          <span class="text-[11px] md:text-sm text-copy-light mb-1">Your picks this week:</span>
+          <div id="footer-picks-list" class="flex flex-wrap gap-2 mb-1.5">
+            {% for p in footer_committed_picks or [] %}
+              <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
+            {% endfor %}
+            {% for _ in range(5 - (footer_committed_picks|length)) %}
+              <span class="chip placeholder">—</span>
+            {% endfor %}
+          </div>
         </div>
+
+        <!-- Overlay submit: covers this block exactly when visible -->
+        <button id="float-submit"
+                type="button"
+                class="hidden absolute inset-0 z-[60]
+                      rounded-md shadow-lg
+                      bg-primary text-primary-content font-medium
+                      hover:bg-primary-dark
+                      focus:outline-none focus:ring-2 focus:ring-primary/40">
+          Submit
+        </button>
       </div>
-    </div>
 
   {% else %}
     <div class="w-full flex justify-center">

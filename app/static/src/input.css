@@ -9,26 +9,72 @@
   }
 
   /* variants (chip_class: win | loss | push | pending | placeholder) */
-  .chip.win         { @apply bg-success/30  border-success  text-copy-light; }
-  .chip.loss        { @apply bg-error/30    border-error    text-copy-light; }
-  .chip.push        { @apply bg-warning/30  border-warning  text-copy-light; }
-  .chip.pending     { @apply bg-foreground  border-border   text-copy-light; }
-  .chip.placeholder { @apply bg-foreground  border-border   text-copy-light; }
+  .chip.win {
+    @apply bg-success/30  border-success  text-copy-light;
+  }
+  .chip.loss {
+    @apply bg-error/30    border-error    text-copy-light;
+  }
+  .chip.push {
+    @apply bg-warning/30  border-warning  text-copy-light;
+  }
+  .chip.pending {
+    @apply bg-foreground  border-border   text-copy-light;
+  }
+  .chip.placeholder {
+    @apply bg-foreground  border-border   text-copy-light;
+  }
 
   /* score badge */
   .score-badge {
     @apply inline-block ml-1 px-1.5 rounded text-xs border font-medium
            border-border bg-foreground text-copy-light;
   }
-  .score-win     { @apply bg-success/30  border-success  text-copy-light; }
-  .score-push    { @apply bg-warning/30  border-warning  text-copy-light; }
-  .score-lose    { @apply bg-error/30    border-error    text-copy-light; }
-  .score-pending { @apply bg-foreground  border-border   text-copy-light; }
-}
+  .score-win {
+    @apply bg-success/30  border-success  text-copy-light;
+  }
+  .score-push {
+    @apply bg-warning/30  border-warning  text-copy-light;
+  }
+  .score-lose {
+    @apply bg-error/30    border-error    text-copy-light;
+  }
+  .score-pending {
+    @apply bg-foreground  border-border   text-copy-light;
+  }
 
+  /* spread pill sizing */
+  .chip.spread {
+    @apply w-[4.5rem] h-10 inline-flex items-center justify-center rounded-full
+           border text-sm font-medium transition;
+  }
+
+  /* picked + not yet scored: brand highlight */
+  .chip.spread.picked.pending {
+    @apply bg-primary/20 border-primary text-primary ring-2 ring-primary/40;
+  }
+
+  /* scored */
+  .chip.spread.picked.win {
+    @apply bg-foreground ring-2 ring-success text-success font-medium;
+  }
+  .chip.spread.picked.loss {
+    @apply bg-foreground ring-2 ring-error text-error font-medium;
+  }
+  .chip.spread.picked.push {
+    @apply bg-foreground ring-2 ring-warning text-warning font-medium;
+  }
+
+  /* disabled/locked visual */
+  .chip.disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+}
 /* Optional helper if you want a reusable chips container */
 @layer utilities {
-  .chips { @apply mt-2 flex flex-wrap gap-2; }
+  .chips {
+    @apply mt-2 flex flex-wrap gap-2;
+  }
 }
 
 /* Make the `dark:` variant follow data-theme if you ever use `dark:` utilities */

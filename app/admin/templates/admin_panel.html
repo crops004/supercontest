@@ -2,164 +2,44 @@
 {% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-[1100px] p-4 text-copy">
-  <h1 class="text-2xl font-bold mb-4">Admin Panel</h1>
+<div class="admin-page mx-auto max-w-[1100px] p-6 text-copy">
+  <h1 class="text-2xl font-bold mb-6">Admin Panel</h1>
 
-  <!-- Core admin actions -->
-  <div class="mb-4 flex flex-wrap gap-2">
-    <form method="post" action="{{ url_for('admin.admin_import_lines', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
-        Import Lines (Pre + Regular)
-      </button>
-    </form>
+  <!-- Hub cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <a href="{{ url_for('admin.actions', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">Admin Actions</div>
+      <p class="text-sm text-copy-lighter">Import lines/scores, lock weeks, finalize ATS.</p>
+    </a>
 
-    <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
-        Import Scores (last 3 days)
-      </button>
-    </form>
+    <a href="{{ url_for('admin.picks_matrix', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">Picks Matrix</div>
+      <p class="text-sm text-copy-lighter">All users’ picks for a week.</p>
+    </a>
 
-    <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
-        Lock Weeks Through Current
-      </button>
-    </form>
+    <a href="{{ url_for('admin.ats_summary', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">ATS Summary</div>
+      <p class="text-sm text-copy-lighter">Covers / Pushes / No-covers by team.</p>
+    </a>
 
-    <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
-        Refresh Spreads (Unlocked Only)
-      </button>
-    </form>
+    <a href="{{ url_for('admin.db_home') }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">DB Management</div>
+      <p class="text-sm text-copy-lighter">Browse tables and edit cells inline.</p>
+    </a>
   </div>
 
-  <!-- Weekly cadence -->
-  <div class="mt-2 mb-6 flex flex-wrap gap-2">
-    <!-- Tuesday midday -->
-    <form action="{{ url_for('admin.admin_prep_week', week=selected_week) }}" method="post" class="inline">
-      <button type="submit" class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
-        Prep Week {{ selected_week }} (Lock + Snapshot Closers)
-      </button>
-    </form>
-
-    <!-- Thu/Sun/Mon nights -->
-    <form action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}" method="post" class="inline">
-      <button type="submit" class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
-        Update Scores + Finalize ATS (Week {{ selected_week }})
-      </button>
-    </form>
-  </div>
-
-  <hr class="my-6 border-border">
-
-  <div class="rounded-xl border border-border bg-foreground p-4 mb-6">
-    <h2 class="text-xl font-semibold mb-4">Picks Matrix</h2>
-
-    <form method="get" action="{{ url_for('admin.admin_panel') }}" class="mb-4 flex items-center gap-3">
-      <label class="flex items-center gap-2">
-        <span class="text-copy-light">Week:</span>
-        <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
-          {% for w in weeks %}
-            <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">
-        Go
-      </button>
-    </form>
-
-    <div class="overflow-x-auto rounded-xl border border-border">
-      <table class="min-w-full text-sm">
-        <thead class="bg-background text-copy-light">
-          <tr>
-            <th class="px-3 py-2 text-left font-semibold">User</th>
-            <th class="px-3 py-2 text-left font-semibold">Pick 1</th>
-            <th class="px-3 py-2 text-left font-semibold">Pick 2</th>
-            <th class="px-3 py-2 text-left font-semibold">Pick 3</th>
-            <th class="px-3 py-2 text-left font-semibold">Pick 4</th>
-            <th class="px-3 py-2 text-left font-semibold">Pick 5</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for row in matrix %}
-          <tr class="hover:bg-background/60">
-            <td class="px-3 py-2 font-medium">{{ row.username }}</td>
-
-            {% for pk in row.picks %}
-              <td class="px-3 py-2">
-                {% if pk.team %}
-                  {% if pk.status in ['win','loss','push','pending'] %}
-                    <span class="chip {{ pk.status }}" title="{{ pk.team }}">{{ pk.team|team_short }}</span>
-                  {% elif pk.status == 'empty' %}
-                    <span class="chip placeholder">—</span>
-                  {% else %}
-                    <span class="chip pending" title="{{ pk.team }}">{{ pk.team|team_short }}</span>
-                  {% endif %}
-                {% else %}
-                  <span class="chip placeholder">—</span>
-                {% endif %}
-              </td>
-            {% endfor %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <!-- Weekly Lines preview on hub -->
+  <div class="rounded-xl border border-border bg-foreground p-4" id="lines">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-semibold">Weekly Lines (Admin Preview)</h2>
+      <span id="admin-lines-status" class="text-copy-light text-sm"></span>
     </div>
-  </div>
 
-  <div class="rounded-xl border border-border bg-foreground p-4 mb-6">
-    <h2 class="text-xl font-semibold mb-3">ATS Summary</h2>
-
-    <!-- ATS Summary Controls -->
-    <form method="get" action="{{ url_for('admin.admin_panel') }}" class="mb-4 flex flex-wrap items-center gap-4">
-      <input type="hidden" name="week" value="{{ selected_week }}">
-      <label class="inline-flex items-center gap-2">
-        <input type="radio" name="ats_scope" value="season" {{ 'checked' if ats_scope != 'week' else '' }} class="accent-primary">
-        <span>Season-to-date (≤ Week {{ selected_week }})</span>
-      </label>
-      <label class="inline-flex items-center gap-2">
-        <input type="radio" name="ats_scope" value="week" {{ 'checked' if ats_scope == 'week' else '' }} class="accent-primary">
-        <span>This week only (Week {{ selected_week }})</span>
-      </label>
-      <button type="submit" class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Update</button>
-    </form>
-
-    <!-- ATS Summary Table -->
-    <div class="overflow-x-auto rounded-xl border border-border">
-      <table class="min-w-full text-sm">
-        <thead class="bg-background text-copy-light">
-          <tr>
-            <th class="px-3 py-2 text-left font-semibold">Team</th>
-            <th class="px-3 py-2 text-center font-semibold">Covers</th>
-            <th class="px-3 py-2 text-center font-semibold">Pushes</th>
-            <th class="px-3 py-2 text-center font-semibold">No-Covers</th>
-            <th class="px-3 py-2 text-center font-semibold">Record</th>
-            <th class="px-3 py-2 text-center font-semibold">Cover %</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for row in ats_summary %}
-          <tr class="hover:bg-background/60">
-            <td class="px-3 py-2">{{ row.team }}</td>
-            <td class="px-3 py-2 text-center">{{ row.covers }}</td>
-            <td class="px-3 py-2 text-center">{{ row.pushes }}</td>
-            <td class="px-3 py-2 text-center">{{ row.nocovers }}</td>
-            <td class="px-3 py-2 text-center">{{ row.record }}</td>
-            <td class="px-3 py-2 text-center">{{ '%.1f%%' % row.pct }}</td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="6" class="px-3 py-3 text-copy-light">No ATS data yet.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="rounded-xl border border-border bg-foreground p-4">
-    <h2 class="text-xl font-semibold mb-3">Weekly Lines (Admin Preview)</h2>
-    <form id="admin-lines-form" class="mb-4 flex items-center gap-3">
+    <form id="admin-lines-form" class="mb-3 flex items-center gap-2">
       <label class="flex items-center gap-2">
         <span class="text-copy-light">Week:</span>
         <select id="admin-lines-week" name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
@@ -168,7 +48,6 @@
           {% endfor %}
         </select>
       </label>
-      <span id="admin-lines-status" class="text-copy-light text-sm"></span>
     </form>
 
     <div id="admin-lines"></div>
@@ -178,74 +57,33 @@
 
 {% block scripts %}
   {{ super() }}
-  <style>
-    /* Theme-aware pick chips */
-    .chip {
-      display:inline-block;
-      min-width: 3.25rem;      /* keeps sizes uniform */
-      text-align:center;
-      padding: .25rem .5rem;
-      border-radius: 9999px;
-      border: 1px solid var(--color-border);
-      background: var(--color-background);
-      color: var(--color-copy);
-      font-weight: 600;
-      line-height: 1.2;
-    }
-    .chip.win {
-      background: var(--color-success);
-      color: var(--color-success-content);
-      border-color: color-mix(in oklab, var(--color-success) 75%, var(--color-border));
-    }
-    .chip.loss {
-      background: var(--color-error);
-      color: var(--color-error-content);
-      border-color: color-mix(in oklab, var(--color-error) 75%, var(--color-border));
-    }
-    .chip.push {
-      background: var(--color-warning);
-      color: var(--color-warning-content);
-      border-color: color-mix(in oklab, var(--color-warning) 75%, var(--color-border));
-    }
-    .chip.pending {
-      background: var(--color-foreground);
-      color: var(--color-copy-light);
-      border-color: var(--color-border);
-    }
-    .chip.placeholder {
-      background: var(--color-foreground);
-      color: var(--color-copy-lighter);
-      border-color: var(--color-border);
-      font-weight: 500;
-    }
-  </style>
-
   <script>
-    (function() {
-      const container = document.getElementById('admin-lines');
-      const weekSel   = document.getElementById('admin-lines-week');
-      const statusEl  = document.getElementById('admin-lines-status');
-      const userTZ    = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  (function() {
+    const container = document.getElementById('admin-lines');
+    const weekSel   = document.getElementById('admin-lines-week');
+    const statusEl  = document.getElementById('admin-lines-status');
+    const userTZ    = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
 
-      async function loadAdminLines(w) {
-        statusEl.textContent = 'Loading…';
-        try {
-          const url = "{{ url_for('admin.admin_lines_fragment') }}" +
-                      "?week=" + encodeURIComponent(w) +
-                      "&tz=" + encodeURIComponent(userTZ);
-          const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
-          const html = await res.text();
-          if (!res.ok) throw new Error(html || ('Failed to load week ' + w));
-          container.innerHTML = html;
-          statusEl.textContent = '';
-        } catch (e) {
-          statusEl.textContent = 'Failed to load lines.';
-          console.error(e);
-        }
+    async function loadAdminLines(w) {
+      if (!container) return;
+      statusEl.textContent = 'Loading…';
+      try {
+        const url = "{{ url_for('admin.admin_lines_fragment') }}" +
+                    "?week=" + encodeURIComponent(w) +
+                    "&tz=" + encodeURIComponent(userTZ);
+        const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+        const html = await res.text();
+        if (!res.ok) throw new Error(html || ('Failed to load week ' + w));
+        container.innerHTML = html;
+        statusEl.textContent = '';
+      } catch (e) {
+        statusEl.textContent = 'Failed to load lines.';
+        console.error(e);
       }
+    }
 
-      weekSel?.addEventListener('change', () => loadAdminLines(weekSel.value));
-      if (weekSel) loadAdminLines(weekSel.value);
-    })();
+    weekSel?.addEventListener('change', () => loadAdminLines(weekSel.value));
+    if (weekSel) loadAdminLines(weekSel.value);
+  })();
   </script>
 {% endblock %}

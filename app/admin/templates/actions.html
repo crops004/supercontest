@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Admin Actions{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[1100px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Admin Actions</h1>
+    <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <form method="get" class="mb-4 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span class="text-copy-light">Week:</span>
+      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Go</button>
+  </form>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="rounded-xl border border-border bg-foreground p-4">
+      <h2 class="text-lg font-semibold mb-3">Data Imports</h2>
+      <div class="flex flex-wrap gap-2">
+        <form method="post" action="{{ url_for('admin.admin_import_lines', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+            Import Lines (Pre + Regular)
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+            Import Scores (last 3 days)
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+            Refresh Spreads (Unlocked Only)
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="rounded-xl border border-border bg-foreground p-4">
+      <h2 class="text-lg font-semibold mb-3">Week Ops</h2>
+      <div class="flex flex-wrap gap-2">
+        <form method="post" action="{{ url_for('admin.admin_prep_week', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+            Prep Week {{ selected_week }} (Lock + Snapshot)
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+            Lock Weeks Through Current
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+            Update Scores + Finalize ATS (Week {{ selected_week }})
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

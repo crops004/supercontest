@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}DB: {{ model_name|capitalize }}{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[1100px] p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">DB: {{ model_name|capitalize }}</h1>
+    <a href="{{ url_for('admin.db_home') }}" class="text-sm hover:underline">← Back to DB Home</a>
+  </div>
+
+  <!-- One GET form that holds search, page size, sort/dir and all filters -->
+  <form class="mb-4 flex gap-2 items-center" method="get">
+    <input name="q" value="{{ q }}" placeholder="Search…"
+           class="rounded border border-border bg-foreground text-copy px-3 py-2">
+    <select name="per_page" class="rounded border border-border bg-foreground text-copy px-3 py-2">
+      {% for n in [10,25,50,100] %}
+        <option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}/page</option>
+      {% endfor %}
+    </select>
+    <!-- preserve current sort/dir -->
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir"  value="{{ dir }}">
+    <!-- render current filters as hidden (they'll be duplicated below as real inputs inside table) -->
+    {% for c in cols %}
+      {% set fv = fvals[c] %}
+      <input type="hidden" name="f_{{ c }}" value="{{ fv.val }}">
+      <input type="hidden" name="f_{{ c }}_min" value="{{ fv.min }}">
+      <input type="hidden" name="f_{{ c }}_max" value="{{ fv.max }}">
+    {% endfor %}
+    <button class="rounded bg-primary text-primary-content px-4 py-2 border border-border hover:bg-primary-dark">Apply</button>
+  </form>
+
+  <div class="overflow-x-auto border border-border rounded-xl bg-foreground">
+    <!-- A second form to submit filters from the filter row (GET). It shares sort/dir/per_page/q values. -->
+    <form method="get">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="per_page" value="{{ per_page }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir"  value="{{ dir }}">
+
+      <table class="w-full text-sm">
+        <thead class="bg-background text-copy font-semibold">
+          <!-- Sortable header row -->
+          <tr class="border-b border-border">
+            {% for c in cols %}
+              {% set is_sorted = (sort == c) %}
+              {% set next_dir = 'desc' if is_sorted and dir == 'asc' else 'asc' %}
+              <th class="px-3 py-1.5 text-left whitespace-nowrap">
+                <a class="inline-flex items-center gap-1 hover:underline"
+                   href="{{ url_for('admin.db_table', model_name=model_name) }}?{{ base_qs }}{% if base_qs %}&{% endif %}sort={{ c }}&dir={{ next_dir }}&page=1">
+                  {{ c }}
+                  {% if is_sorted %}
+                    <span class="opacity-70">{{ '▲' if dir == 'asc' else '▼' }}</span>
+                  {% else %}
+                    <span class="opacity-30">↕</span>
+                  {% endif %}
+                </a>
+              </th>
+            {% endfor %}
+          </tr>
+
+          <!-- Filter inputs row -->
+          <tr class="border-b border-border text-xs font-normal">
+            {% for c in cols %}
+              {% set kind = col_kinds[c] %}
+              {% set fv = fvals[c] %}
+              <th class="px-3 py-1 bg-background">
+                {% if kind == 'text' %}
+                  <input name="f_{{ c }}" value="{{ fv.val }}" placeholder="contains…"
+                         class="w-full rounded border border-border bg-foreground px-2 py-1">
+                {% elif kind == 'bool' %}
+                  <select name="f_{{ c }}" class="w-full rounded border border-border bg-foreground px-2 py-1">
+                    <option value="">Any</option>
+                    <option value="true"  {% if fv.val|lower in ['true','1','yes','y','on'] %}selected{% endif %}>True</option>
+                    <option value="false" {% if fv.val|lower in ['false','0','no','n','off'] %}selected{% endif %}>False</option>
+                  </select>
+                {% elif kind in ['int', 'num'] %}
+                  <div class="flex items-center gap-1">
+                    <input name="f_{{ c }}_min" value="{{ fv.min }}" type="number" placeholder="min"
+                           class="w-20 rounded border border-border bg-foreground px-2 py-1">
+                    <span>–</span>
+                    <input name="f_{{ c }}_max" value="{{ fv.max }}" type="number" placeholder="max"
+                           class="w-20 rounded border border-border bg-foreground px-2 py-1">
+                  </div>
+                {% elif kind == 'dt' %}
+                  <div class="flex items-center gap-1">
+                    <input name="f_{{ c }}_min" value="{{ fv.min }}" type="datetime-local"
+                           class="rounded border border-border bg-foreground px-2 py-1">
+                    <span>–</span>
+                    <input name="f_{{ c }}_max" value="{{ fv.max }}" type="datetime-local"
+                           class="rounded border border-border bg-foreground px-2 py-1">
+                  </div>
+                {% elif kind == 'date' %}
+                  <div class="flex items-center gap-1">
+                    <input name="f_{{ c }}_min" value="{{ fv.min }}" type="date"
+                           class="rounded border border-border bg-foreground px-2 py-1">
+                    <span>–</span>
+                    <input name="f_{{ c }}_max" value="{{ fv.max }}" type="date"
+                           class="rounded border border-border bg-foreground px-2 py-1">
+                  </div>
+                {% else %}
+                  <input name="f_{{ c }}" value="{{ fv.val }}" placeholder="filter…"
+                         class="w-full rounded border border-border bg-foreground px-2 py-1">
+                {% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+
+        <tbody class="divide-y divide-border">
+          {% for row in rows %}
+            <tr class="hover:bg-background/60">
+              {% for c in cols %}
+                {% set is_pk = (c == pk) %}
+
+                {# compact cell heuristics to reduce row height #}
+                {% set cls = 'px-3 py-1.5 align-top whitespace-nowrap' %}
+                {% if c.endswith('_id') and c != 'id' %}
+                  {% set cls = 'px-3 py-1.5 align-top max-w-[28ch] truncate font-mono text-xs' %}
+                {% elif c.endswith('_at') or 'date' in c or 'time' in c %}
+                  {% set cls = 'px-3 py-1.5 align-top whitespace-nowrap text-xs' %}
+                {% endif %}
+
+                <td class="{{ cls }}">
+                  {% if is_pk %}
+                    <span class="text-copy-lighter" title="{{ row|attr(c) }}">{{ row|attr(c) }}</span>
+                  {% else %}
+                    <span class="editable block rounded px-2 py-1 bg-foreground/60 hover:bg-foreground"
+                          contenteditable="true"
+                          data-id="{{ row|attr(pk) }}"
+                          data-field="{{ c }}"
+                          title="{{ row|attr(c) }}">{{ row|attr(c) }}</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="flex justify-end gap-2 mt-3">
+        <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm" type="submit">
+          Apply Filters
+        </button>
+        <a class="px-3 py-1 rounded border border-border bg-foreground text-sm"
+           href="{{ url_for('admin.db_table', model_name=model_name, per_page=per_page, sort=sort, dir=dir) }}">
+          Reset
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div class="flex gap-2 justify-end mt-3 text-sm">
+    <a class="px-3 py-2 rounded border border-border bg-foreground {% if page<=1 %}opacity-50 pointer-events-none{% endif %}"
+       href="{{ url_for('admin.db_table', model_name=model_name) }}?{{ base_qs }}{% if base_qs %}&{% endif %}page={{ page-1 }}&per_page={{ per_page }}&sort={{ sort }}&dir={{ dir }}">
+      Prev
+    </a>
+    <div class="px-3 py-2 rounded border border-border bg-foreground">Page {{ page }} / {{ pages }}</div>
+    <a class="px-3 py-2 rounded border border-border bg-foreground {% if page>=pages %}opacity-50 pointer-events-none{% endif %}"
+       href="{{ url_for('admin.db_table', model_name=model_name) }}?{{ base_qs }}{% if base_qs %}&{% endif %}page={{ page+1 }}&per_page={{ per_page }}&sort={{ sort }}&dir={{ dir }}">
+      Next
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+  // Inline, per-cell save on blur
+  document.addEventListener('blur', async (e) => {
+    const el = e.target.closest('.editable');
+    if (!el) return;
+
+    const rowId = el.dataset.id;
+    const field = el.dataset.field;
+    const value = el.innerText.trim();
+
+    const prevOpacity = el.style.opacity;
+    el.style.opacity = 0.6;
+
+    try {
+      const patchUrl = "{{ url_for('admin.db_update_cell', model_name=model_name, row_id=0) }}".replace(/0$/, rowId);
+      const res = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field, value })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Update failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error while saving change.');
+    } finally {
+      el.style.opacity = prevOpacity || 1;
+    }
+  }, true);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}DB Management{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[1100px] p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">DB Management</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <p class="text-sm text-copy-lighter mb-4">
+    Pick a table to browse and edit inline. Changes save on blur.
+  </p>
+
+  <ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    {% for name in model_names %}
+      <li>
+        <a href="{{ url_for('admin.db_table', model_name=name) }}"
+           class="block rounded-xl border border-border bg-foreground px-4 py-3 hover:ring-2 hover:ring-primary/40">
+          {{ name|capitalize }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

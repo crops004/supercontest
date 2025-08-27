@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}ATS Summary{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[1100px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">ATS Summary</h1>
+    <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <form method="get" class="mb-4 flex flex-wrap items-center gap-4">
+    <label class="flex items-center gap-2">
+      <span class="text-copy-light">Week:</span>
+      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="inline-flex items-center gap-2">
+      <input type="radio" name="ats_scope" value="season" {{ 'checked' if ats_scope != 'week' else '' }} class="accent-primary">
+      <span>Season-to-date (≤ Week {{ selected_week }})</span>
+    </label>
+    <label class="inline-flex items-center gap-2">
+      <input type="radio" name="ats_scope" value="week" {{ 'checked' if ats_scope == 'week' else '' }} class="accent-primary">
+      <span>This week only (Week {{ selected_week }})</span>
+    </label>
+    <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Update</button>
+  </form>
+
+  <div class="overflow-x-auto rounded-xl border border-border bg-foreground">
+    <table class="min-w-full text-sm">
+      <thead class="bg-background text-copy-light">
+        <tr>
+          <th class="px-3 py-2 text-left font-semibold">Team</th>
+          <th class="px-3 py-2 text-center font-semibold">Covers</th>
+          <th class="px-3 py-2 text-center font-semibold">Pushes</th>
+          <th class="px-3 py-2 text-center font-semibold">No-Covers</th>
+          <th class="px-3 py-2 text-center font-semibold">Record</th>
+          <th class="px-3 py-2 text-center font-semibold">Cover %</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {% for row in ats_summary %}
+        <tr class="hover:bg-background/60">
+          <td class="px-3 py-2">{{ row.team }}</td>
+          <td class="px-3 py-2 text-center">{{ row.covers }}</td>
+          <td class="px-3 py-2 text-center">{{ row.pushes }}</td>
+          <td class="px-3 py-2 text-center">{{ row.nocovers }}</td>
+          <td class="px-3 py-2 text-center">{{ row.record }}</td>
+          <td class="px-3 py-2 text-center">{{ '%.1f%%' % row.pct }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-3 py-3 text-copy-light">No ATS data.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

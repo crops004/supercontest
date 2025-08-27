@@ -38,7 +38,7 @@
 {% block content %}
 <div class="max-w-[1100px] mx-auto my-6 px-4 text-copy-light">
   <!-- Week Controls: sticky under the navbar -->
-  <div id="week-controls" class="sticky z-30 bg-background border-b border-border" style="top: 0;">
+  <div id="week-controls" class="sticky z-30 bg-background border-b border-border" style="top: 0;" data-selected-week="{{ selected_week }}">
     <div class="flex items-center gap-2 py-2">
       <button id="prev"
         class="px-2 py-1 border border-border bg-background rounded hover:bg-foreground disabled:opacity-50 disabled:cursor-default"
@@ -84,282 +84,303 @@
 </div>
 
 <!-- Floating Submit (hidden until there are unsaved changes) -->
-<button id="float-submit" class="hidden fixed bottom-5 right-5 z-30 px-4 py-2 rounded-full shadow-lg
-               bg-primary text-primary-content hover:bg-primary-dark focus:outline-none" type="button">
+<!-- <button id="float-submit"
+  class="hidden fixed bottom-5 right-5 z-[60] px-4 py-2 rounded-md shadow-lg
+         bg-primary text-primary-content hover:bg-primary-dark
+         focus:outline-none focus:ring-1 focus:ring-primary/40
+         pointer-events-auto"
+  type="button">
   Submit changes
-</button>
+</button> -->
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-  const weekEl = document.getElementById('week');
-  const gamesEl = document.getElementById('games');
-  const statusEl = document.getElementById('status');
-  const prevBtn = document.getElementById('prev');
-  const nextBtn = document.getElementById('next');
-  const hiddenWeek = document.getElementById('week-hidden');
-  const hiddenTz = document.getElementById('tz-hidden');
-  const formEl = document.getElementById('picks-form');
-  const floatBtn = document.getElementById('float-submit');
-  const fallbackHidden = document.getElementById('fallback-hidden-inputs');
+/* ========================================================================== *
+ * Weekly Lines: Client-Side Logic
+ * - Single delegated chip handler (bound once) to avoid double-binding
+ * - Selection model + 5-pick cap (accounting for locked games)
+ * - Fragment loading per week
+ * - Footer “Your picks this week” live update after submit
+ * ========================================================================== */
 
-  // Sticky pieces
-  const navEl = document.querySelector('nav');
-  const weekControls = document.getElementById('week-controls');
+/* ---------- DOM refs ---------- */
+const weekEl         = document.getElementById('week');
+const gamesEl        = document.getElementById('games');
+const statusEl       = document.getElementById('status');
+const prevBtn        = document.getElementById('prev');
+const nextBtn        = document.getElementById('next');
+const hiddenWeek     = document.getElementById('week-hidden');
+const hiddenTz       = document.getElementById('tz-hidden');
+const formEl         = document.getElementById('picks-form');
+const floatBtn       = document.getElementById('float-submit');
+const fallbackHidden = document.getElementById('fallback-hidden-inputs');
+const navEl          = document.querySelector('nav');
+const weekControls   = document.getElementById('week-controls');
 
-  // Robust TZ detection with a fallback
-  const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
+/* ---------- Timezone ---------- */
+const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedTZ : 'UTC';
 
-  // Local “dirty” state & client cache
-  let dirty = false;
-  function storageKey(week) { return `pendingPicks:${week}`; }
+/* ---------- Local “dirty” state & cache ---------- */
+let dirty = false;
+function storageKey(week) { return `pendingPicks:${week}`; }
 
-  function getWeekOptions() {
-    return Array.from(weekEl.options).map(o => parseInt(o.value, 10)).filter(n => !Number.isNaN(n));
+/* ========================================================================== *
+ * Utilities
+ * ========================================================================== */
+
+/** Robustly get current week (no Jinja in JS). */
+function currentWeek() {
+  const v1 = parseInt((weekEl && weekEl.value) || "", 10);
+  if (Number.isFinite(v1)) return v1;
+
+  const v2 = parseInt((hiddenWeek && hiddenWeek.value) || "", 10);
+  if (Number.isFinite(v2)) return v2;
+
+  const ds = document.getElementById("week-controls")?.dataset;
+  const v3 = parseInt((ds && ds.selectedWeek) || "", 10);
+  if (Number.isFinite(v3)) return v3;
+
+  return 0; // will trigger server-side error if truly missing
+}
+
+/** Build list of week options from the select. */
+function getWeekOptions() {
+  return Array.from(weekEl.options)
+    .map(o => parseInt(o.value, 10))
+    .filter(n => !Number.isNaN(n));
+}
+
+/** Enable/disable pager buttons. */
+function updatePagerDisabled() {
+  const weeks = getWeekOptions();
+  const cur = parseInt(weekEl.value, 10);
+  prevBtn && (prevBtn.disabled = cur <= Math.min(...weeks));
+  nextBtn && (nextBtn.disabled = cur >= Math.max(...weeks));
+}
+
+/** Keep hidden context inputs updated for fallback POST. */
+function updateHiddenContext() {
+  if (hiddenWeek) hiddenWeek.value = String(weekEl.value);
+  if (hiddenTz) hiddenTz.value = userTZ;
+}
+
+/** Show/hide floating submit button. */
+function setDirty(isDirty) {
+  dirty = !!isDirty;
+  if (!floatBtn) return;
+  if (dirty) {
+    floatBtn.classList.remove('hidden');
+    floatBtn.classList.add('flex', 'items-center', 'justify-center');
+  } else {
+    floatBtn.classList.add('hidden');
+    floatBtn.classList.remove('flex', 'items-center', 'justify-center');
   }
-  function updatePagerDisabled() {
-    const weeks = getWeekOptions();
-    const cur = parseInt(weekEl.value, 10);
-    prevBtn && (prevBtn.disabled = cur <= Math.min(...weeks));
-    nextBtn && (nextBtn.disabled = cur >= Math.max(...weeks));
-  }
-  function updateHiddenContext() {
-    if (hiddenWeek) hiddenWeek.value = String(weekEl.value);
-    if (hiddenTz) hiddenTz.value = userTZ;
-  }
+}
 
-  // ----- Selection model -----
-  function currentWeek() { return parseInt(weekEl.value, 10); }
+/* ========================================================================== *
+ * Selection model (chips)
+ * ========================================================================== */
 
-  function collectSelectionsFromUI() {
-    const chips = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]');
-    const picks = [];
-    chips.forEach(ch => {
-      if (ch.closest('[data-locked="1"]')) return;
-      const gid = ch.getAttribute('data-game');
-      const team = ch.getAttribute('data-team');
-      if (gid && team) picks.push(`${gid}::${team}`);
-    });
-    return picks;
-  }
+/** Return list of selected values as "gameId::Team Name". */
+function collectSelectionsFromUI() {
+  const chips = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]');
+  const picks = [];
+  chips.forEach(ch => {
+    if (ch.closest('[data-locked="1"]')) return;
+    const gid = ch.getAttribute('data-game');
+    const team = ch.getAttribute('data-team');
+    if (gid && team) picks.push(`${gid}::${team}`);
+  });
+  return picks;
+}
 
-  function syncFallbackHiddenInputs() {
-    if (!fallbackHidden) return;
-    fallbackHidden.innerHTML = '';
-    collectSelectionsFromUI().forEach(val => {
-      const [gid, team] = val.split('::');
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'picks';
-      input.value = `${gid}|${team}`;
-      fallbackHidden.appendChild(input);
-    });
-  }
+/** Keep fallback hidden inputs in sync (non-JS POST). */
+function syncFallbackHiddenInputs() {
+  if (!fallbackHidden) return;
+  fallbackHidden.innerHTML = '';
+  collectSelectionsFromUI().forEach(val => {
+    const [gid, team] = val.split('::');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'picks';
+    input.value = `${gid}|${team}`;
+    fallbackHidden.appendChild(input);
+  });
+}
 
-  function setDirty(isDirty) {
-    dirty = !!isDirty;
-    floatBtn.classList.toggle('hidden', !dirty);
-  }
+/** Visual + aria toggling for a chip. */
+function setChipPressed(chip, pressed) {
+  chip.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  chip.classList.toggle('picked', !!pressed);
+  const row = chip.closest('[data-team-row]');
+  if (row) row.setAttribute('data-picked', pressed ? '1' : '0');
+}
 
-  function computeAlreadyLockedCount() {
-    const savedLocked = gamesEl.querySelectorAll('[data-card][data-locked="1"] [data-team-row][data-picked="1"]');
-    const gameSet = new Set();
-    savedLocked.forEach(el => gameSet.add(el.closest('[data-card]').getAttribute('data-game')));
-    return gameSet.size;
-  }
+/** Unpress other chip in the same game. */
+function unpressSiblings(chip) {
+  const gid = chip.getAttribute('data-game');
+  const sibs = gamesEl.querySelectorAll(`[data-role="spread-chip"][data-game="${gid}"]`);
+  sibs.forEach(s => { if (s !== chip) setChipPressed(s, false); });
+}
 
-  function currentSelectedCount() {
-    const selected = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]:not([data-locked-chip="1"])');
-    const gameSet = new Set();
-    selected.forEach(ch => gameSet.add(ch.getAttribute('data-game')));
-    return gameSet.size;
-  }
+/** Count already-picked *locked* games (from saved state). */
+function computeAlreadyLockedCount() {
+  const savedLocked = gamesEl.querySelectorAll('[data-card][data-locked="1"] [data-team-row][data-picked="1"]');
+  const gameSet = new Set();
+  savedLocked.forEach(el => gameSet.add(el.closest('[data-card]').getAttribute('data-game')));
+  return gameSet.size;
+}
 
-  function enforcePerGameExclusive(chip) {
-    const gid = chip.getAttribute('data-game');
-    const sibs = gamesEl.querySelectorAll(`[data-role="spread-chip"][data-game="${gid}"]`);
-    sibs.forEach(s => { if (s !== chip) s.setAttribute('aria-pressed', 'false'); });
-  }
+/** Count currently selected (unlocked) games. */
+function currentSelectedCount() {
+  const selected = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]:not([data-locked-chip="1"])');
+  const gameSet = new Set();
+  selected.forEach(ch => gameSet.add(ch.getAttribute('data-game')));
+  return gameSet.size;
+}
 
-  function tryToggleChip(chip) {
-    if (chip.getAttribute('data-disabled') === '1') return;
+/** Toggle handler with per-game exclusivity and 5-cap. */
+function tryToggleChip(chip) {
+  if (chip.getAttribute('data-disabled') === '1') return;
 
-    const wasPressed = chip.getAttribute('aria-pressed') === 'true';
-    if (wasPressed) {
-      chip.setAttribute('aria-pressed', 'false');
-      setDirty(true);
-      syncFallbackHiddenInputs();
-      cacheSelections();
-      return;
-    }
+  const wasPressed = chip.getAttribute('aria-pressed') === 'true';
 
-    const lockedExisting = computeAlreadyLockedCount();
-    const cap = Math.max(0, 5 - lockedExisting);
-    const before = currentSelectedCount();
-
-    if (before >= cap) {
-      chip.classList.add('shake');
-      setTimeout(() => chip.classList.remove('shake'), 450);
-      statusEl.textContent = `You can only have ${cap} more pick${cap === 1 ? '' : 's'} this week.`;
-      return;
-    }
-
-    chip.setAttribute('aria-pressed', 'true');
-    enforcePerGameExclusive(chip);
+  // Unselect path (toggle off)
+  if (wasPressed) {
+    setChipPressed(chip, false);
     setDirty(true);
     syncFallbackHiddenInputs();
     cacheSelections();
+    return;
   }
 
-  function attachChipHandlers() {
-    gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(chip => {
-      chip.addEventListener('click', () => tryToggleChip(chip));
-      chip.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tryToggleChip(chip); }
-      });
-    });
+  // Enforce one per game
+  unpressSiblings(chip);
+
+  // Enforce 5-cap after counting already-locked picks
+  const lockedExisting = computeAlreadyLockedCount();
+  const cap = Math.max(0, 5 - lockedExisting);
+  const before = currentSelectedCount();
+  if (before >= cap) {
+    chip.classList.add('shake');
+    setTimeout(() => chip.classList.remove('shake'), 450);
+    statusEl.textContent = `You can only have ${cap} more pick${cap === 1 ? '' : 's'} this week.`;
+    return;
   }
 
-  // ----- Sticky offsets: navbar + week controls + day headers -----
-  function measureHeights() {
-    const navH = navEl?.offsetHeight || 56;
-    const wcH = weekControls?.offsetHeight || 48;
-    const pad = 0;
-    return { navH, wcH, pad };
-  }
+  // Select path
+  setChipPressed(chip, true);
+  setDirty(true);
+  syncFallbackHiddenInputs();
+  cacheSelections();
+}
 
-  function applyStickyOffsets() {
-    const { navH, wcH } = measureHeights();
+/* ---------- ONE-TIME delegated listeners (avoid double-binding) ---------- */
+let chipDelegationBound = false;
+function bindChipDelegationOnce() {
+  if (chipDelegationBound || !gamesEl) return;
+  chipDelegationBound = true;
 
-    if (weekControls) weekControls.style.top = `${navH}px`;
-
-    const dayTop = navH + wcH;
-    document.querySelectorAll('[data-header="day"]').forEach(h2 => {
-      h2.style.position = 'sticky';
-      h2.style.top = `${dayTop}px`;
-      h2.classList.add('z-20', 'bg-background', 'px-2', 'py-2', 'mt-2', 'text-copy-light');
-    });
-  }
-
-  // (1) Format Day headers as "Day (M/D)" using their data attributes and user TZ
-  function decorateDayHeaders() {
-    const headers = document.querySelectorAll('[data-header="day"]');
-    headers.forEach(h => {
-      const title = h.getAttribute('data-title') || h.textContent || '';
-      const iso = h.getAttribute('data-date-iso') || '';
-      const md = formatMDFromISO(iso, userTZ);
-      h.textContent = md ? `${title} (${md})` : title;
-    });
-  }
-  function formatMDFromISO(iso, tz) {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      const mo = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'numeric' }).format(d);
-      const da = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' }).format(d);
-      return `${mo}/${da}`;
-    } catch { return ''; }
-  }
-
-  // ----- Load fragment -----
-  async function loadWeek(w) {
-    statusEl.textContent = 'Loading…';
-    try {
-      const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
-        "?week=" + encodeURIComponent(w) +
-        "&tz=" + encodeURIComponent(userTZ);
-      const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
-      const body = await res.text();
-      if (!res.ok) {
-        gamesEl.innerHTML = '<p class="text-sm text-copy-lighter">Sorry, couldn’t load games.</p>';
-        statusEl.textContent = 'Failed to load week ' + w + '.';
-        return;
-      }
-      gamesEl.innerHTML = body;
-      history.replaceState(null, '', "{{ url_for('weekly_lines.weekly_lines') }}" +
-        "?week=" + encodeURIComponent(w) + "&tz=" + encodeURIComponent(userTZ));
-      statusEl.textContent = '';
-      updatePagerDisabled();
-      updateHiddenContext();
-      attachChipHandlers();
-
-      requestAnimationFrame(() => {
-        decorateDayHeaders();
-        applyStickyOffsets();
-      });
-
-      restoreSelectionsFromCache();
-      syncFallbackHiddenInputs();
-      setDirty(false);
-    } catch (e) {
-      console.error(e);
-      statusEl.textContent = 'Failed to load week ' + w;
-    }
-  }
-
-  function restoreSelectionsFromCache() {
-    const wk = currentWeek();
-    try {
-      const raw = localStorage.getItem(storageKey(wk));
-      if (!raw) return;
-      const picks = JSON.parse(raw);
-      const set = new Set(picks);
-      gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(ch => {
-        const id = `${ch.getAttribute('data-game')}::${ch.getAttribute('data-team')}`;
-        if (set.has(id) && ch.getAttribute('data-locked-chip') !== '1') {
-          ch.setAttribute('aria-pressed', 'true');
-          enforcePerGameExclusive(ch);
-        }
-      });
-    } catch (_) { }
-  }
-  function cacheSelections() {
-    const wk = currentWeek();
-    localStorage.setItem(storageKey(wk), JSON.stringify(collectSelectionsFromUI()));
-  }
-  function clearCacheForWeek(wk) {
-    localStorage.removeItem(storageKey(wk));
-  }
-
-  // Floating submit → AJAX
-  floatBtn?.addEventListener('click', async () => {
-    const picks = collectSelectionsFromUI();
-    const wk = currentWeek();
-    if (picks.length === 0) {
-      setDirty(false);
-      return;
-    }
-    statusEl.textContent = 'Saving…';
-    floatBtn.disabled = true;
-    try {
-      const res = await fetch("{{ url_for('weekly_lines.submit_picks_api') }}", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ week: wk, picks })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        statusEl.textContent = data.error || 'Failed to save picks.';
-        floatBtn.disabled = false;
-        return;
-      }
-      statusEl.textContent = `Saved ${data.saved} pick${data.saved === 1 ? '' : 's'}.`;
-      setDirty(false);
-      floatBtn.disabled = false;
-      clearCacheForWeek(wk);
-      loadWeek(wk);
-    } catch (e) {
-      console.error(e);
-      statusEl.textContent = 'Save failed.';
-      floatBtn.disabled = false;
-    }
+  // Click delegation
+  gamesEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-role="spread-chip"]');
+    if (!chip || !gamesEl.contains(chip)) return;
+    tryToggleChip(chip);
   });
 
-  // Pager & initial setup
-  function initAfterRender() {
+  // Keyboard delegation (Enter/Space)
+  gamesEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const chip = e.target.closest('[data-role="spread-chip"]');
+    if (!chip || !gamesEl.contains(chip)) return;
+    e.preventDefault();
+    tryToggleChip(chip);
+  });
+}
+
+/** Normalize initial visual/aria state AFTER fragment loads. */
+function attachChipHandlers() {
+  gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(chip => {
+    const pressed = chip.getAttribute('aria-pressed') === 'true';
+    setChipPressed(chip, pressed);
+  });
+}
+
+/* ========================================================================== *
+ * Sticky/formatting helpers (headers, offsets)
+ * ========================================================================== */
+
+function measureHeights() {
+  const navH = navEl?.offsetHeight || 56;
+  const wcH  = weekControls?.offsetHeight || 48;
+  return { navH, wcH, pad: 0 };
+}
+
+function applyStickyOffsets() {
+  const { navH, wcH } = measureHeights();
+  if (weekControls) weekControls.style.top = `${navH}px`;
+
+  const dayTop = navH + wcH;
+  document.querySelectorAll('[data-header="day"]').forEach(h2 => {
+    h2.style.position = 'sticky';
+    h2.style.top = `${dayTop}px`;
+    h2.classList.add('z-20', 'bg-background', 'px-2', 'py-2', 'mt-2', 'text-copy-light');
+  });
+}
+
+/** Format headers like "Sunday (9/1)" based on ISO & TZ. */
+function decorateDayHeaders() {
+  const headers = document.querySelectorAll('[data-header="day"]');
+  headers.forEach(h => {
+    const title = h.getAttribute('data-title') || h.textContent || '';
+    const iso = h.getAttribute('data-date-iso') || '';
+    const md = formatMDFromISO(iso, userTZ);
+    h.textContent = md ? `${title} (${md})` : title;
+  });
+}
+function formatMDFromISO(iso, tz) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const mo = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'numeric' }).format(d);
+    const da = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: 'numeric' }).format(d);
+    return `${mo}/${da}`;
+  } catch { return ''; }
+}
+
+/* ========================================================================== *
+ * Fragment loading
+ * ========================================================================== */
+
+async function loadWeek(w) {
+  statusEl.textContent = 'Loading…';
+  try {
+    const url = "{{ url_for('weekly_lines.weekly_lines_fragment') }}" +
+      "?week=" + encodeURIComponent(w) +
+      "&tz=" + encodeURIComponent(userTZ);
+
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+    const body = await res.text();
+
+    if (!res.ok) {
+      gamesEl.innerHTML = '<p class="text-sm text-copy-lighter">Sorry, couldn’t load games.</p>';
+      statusEl.textContent = 'Failed to load week ' + w + '.';
+      return;
+    }
+
+    gamesEl.innerHTML = body;
+
+    history.replaceState(null, '', "{{ url_for('weekly_lines.weekly_lines') }}" +
+      "?week=" + encodeURIComponent(w) + "&tz=" + encodeURIComponent(userTZ));
+
+    statusEl.textContent = '';
+    updatePagerDisabled();
     updateHiddenContext();
+
+    // IMPORTANT: normalize after each fragment load (no re-binding of listeners)
     attachChipHandlers();
 
     requestAnimationFrame(() => {
@@ -367,37 +388,173 @@
       applyStickyOffsets();
     });
 
-    updatePagerDisabled();
     restoreSelectionsFromCache();
     syncFallbackHiddenInputs();
     setDirty(false);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = 'Failed to load week ' + w;
+  }
+}
+
+/* ========================================================================== *
+ * Local cache
+ * ========================================================================== */
+
+function restoreSelectionsFromCache() {
+  // If server rendered any picks, trust them and skip cache restore
+  if (gamesEl.querySelector('[data-role="spread-chip"][aria-pressed="true"]')) return;
+
+  const wk = currentWeek();
+  try {
+    const raw = localStorage.getItem(storageKey(wk));
+    if (!raw) return;
+    const picks = JSON.parse(raw);
+    const set = new Set(picks);
+    gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(ch => {
+      const id = `${ch.getAttribute('data-game')}::${ch.getAttribute('data-team')}`;
+      if (set.has(id) && ch.getAttribute('data-locked-chip') !== '1') {
+        setChipPressed(ch, true);
+        unpressSiblings(ch);
+      }
+    });
+  } catch (_) { }
+}
+function cacheSelections() {
+  const wk = currentWeek();
+  localStorage.setItem(storageKey(wk), JSON.stringify(collectSelectionsFromUI()));
+}
+function clearCacheForWeek(wk) {
+  localStorage.removeItem(storageKey(wk));
+}
+
+/* ========================================================================== *
+ * Footer: "Your picks this week" live renderer
+ * ========================================================================== */
+
+/** Render the footer picks chips immediately after a successful submit. */
+function renderFooterPicks(committed, cap = 5) {
+  const list = document.getElementById('footer-picks-list');
+  if (!list) return;
+
+  const picks = Array.isArray(committed) ? committed.slice(0, cap) : [];
+  list.innerHTML = '';
+
+  // Committed picks
+  for (const { abbr, team } of picks) {
+    const el = document.createElement('span');
+    el.className = 'chip';
+    el.textContent = (abbr && abbr.trim()) ? abbr : team;
+    list.appendChild(el);
   }
 
-  weekEl.addEventListener('change', e => loadWeek(e.target.value));
-  document.getElementById('prev')?.addEventListener('click', () => {
-    const weeks = getWeekOptions();
-    const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
-    if (curIdx > 0) {
-      weekEl.value = String(weeks[curIdx - 1]);
-      loadWeek(weekEl.value);
-    }
-  });
-  document.getElementById('next')?.addEventListener('click', () => {
-    const weeks = getWeekOptions();
-    const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
-    if (curIdx >= 0 && curIdx < weeks.length - 1) {
-      weekEl.value = String(weeks[curIdx + 1]);
-      loadWeek(weekEl.value);
-    }
-  });
+  // Fill placeholders
+  for (let i = picks.length; i < cap; i++) {
+    const ph = document.createElement('span');
+    ph.className = 'chip placeholder';
+    ph.textContent = '—';
+    list.appendChild(ph);
+  }
+}
 
-  window.addEventListener('resize', () => {
+/* ========================================================================== *
+ * Submit handler (AJAX → replace unlocked picks for the week)
+ * ========================================================================== */
+
+floatBtn?.addEventListener('click', async () => {
+  const picks = collectSelectionsFromUI();
+  const wk = currentWeek();
+  console.log('[submit] week=', wk, 'picks=', picks);
+
+  statusEl.textContent = 'Saving…';
+  floatBtn.disabled = true;
+
+  try {
+    const res = await fetch("{{ url_for('weekly_lines.submit_picks_api') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: wk, picks })
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch { /* ignore parse error */ }
+
+    if (!res.ok || !data.ok) {
+      statusEl.textContent = (data && data.error) ? data.error : `Save failed (${res.status}).`;
+      floatBtn.disabled = false;
+      return;
+    }
+
+    // ✅ Update footer immediately using DB-confirmed truth
+    renderFooterPicks(data.committed_picks || []);
+
+    statusEl.textContent = `Saved ${data.saved} pick${data.saved === 1 ? '' : 's'}.`;
+    setDirty(false);
+    floatBtn.disabled = false;
+    clearCacheForWeek(wk);
+
+    // Refresh the games grid (locks, badges, picked state)
+    loadWeek(wk);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = 'Save failed.';
+    floatBtn.disabled = false;
+  }
+});
+
+/* ========================================================================== *
+ * Init & Events
+ * ========================================================================== */
+
+function initAfterRender() {
+  updateHiddenContext();
+  updatePagerDisabled();
+
+  // Bind delegation ONCE for page lifetime, then only normalize on loads
+  bindChipDelegationOnce();
+  attachChipHandlers();
+
+  requestAnimationFrame(() => {
     decorateDayHeaders();
     applyStickyOffsets();
-  }, { passive: true });
+  });
 
-  const qs = new URLSearchParams(window.location.search);
-  initAfterRender();
-  if (!qs.has('tz')) setTimeout(() => loadWeek(weekEl.value), 0);
+  restoreSelectionsFromCache();
+  syncFallbackHiddenInputs();
+  setDirty(false);
+}
+
+// Pager events
+weekEl.addEventListener('change', e => loadWeek(e.target.value));
+document.getElementById('prev')?.addEventListener('click', () => {
+  const weeks = getWeekOptions();
+  const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
+  if (curIdx > 0) {
+    weekEl.value = String(weeks[curIdx - 1]);
+    loadWeek(weekEl.value);
+  }
+});
+document.getElementById('next')?.addEventListener('click', () => {
+  const weeks = getWeekOptions();
+  const curIdx = weeks.indexOf(parseInt(weekEl.value, 10));
+  if (curIdx >= 0 && curIdx < weeks.length - 1) {
+    weekEl.value = String(weeks[curIdx + 1]);
+    loadWeek(weekEl.value);
+  }
+});
+
+// Window resize → resticky headers
+window.addEventListener('resize', () => {
+  decorateDayHeaders();
+  applyStickyOffsets();
+}, { passive: true });
+
+// First-run init
+initAfterRender();
+
+// If tz not present in URL, reload once to lock it in
+const qs = new URLSearchParams(window.location.search);
+if (!qs.has('tz')) setTimeout(() => loadWeek(weekEl.value), 0);
+
 </script>
 {% endblock %}

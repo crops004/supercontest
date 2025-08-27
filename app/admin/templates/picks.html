@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Picks Matrix{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[1100px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Picks Matrix</h1>
+    <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <form method="get" class="mb-3 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span class="text-copy-light">Week:</span>
+      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Go</button>
+  </form>
+
+  <div class="overflow-x-auto rounded-xl border border-border">
+    <table class="min-w-full text-sm">
+      <thead class="bg-background text-copy-light">
+        <tr>
+          <th class="px-3 py-2 text-left font-semibold">User</th>
+          <th class="px-3 py-2 text-left font-semibold">Pick 1</th>
+          <th class="px-3 py-2 text-left font-semibold">Pick 2</th>
+          <th class="px-3 py-2 text-left font-semibold">Pick 3</th>
+          <th class="px-3 py-2 text-left font-semibold">Pick 4</th>
+          <th class="px-3 py-2 text-left font-semibold">Pick 5</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {% for row in matrix %}
+        <tr class="hover:bg-background/60">
+          <td class="px-3 py-2 font-medium">{{ row.username }}</td>
+          {% for pk in row.picks %}
+            <td class="px-3 py-2">
+              {% if pk.team %}
+                {% if pk.status in ['win','loss','push','pending'] %}
+                  <span class="chip {{ pk.status }} inline-flex items-center justify-center w-24"
+                        title="{{ pk.team }}">{{ pk.team|team_short }}</span>
+                {% elif pk.status == 'empty' %}
+                  <span class="chip placeholder inline-flex items-center justify-center w-24">—</span>
+                {% else %}
+                  <span class="chip pending inline-flex items-center justify-center w-24"
+                        title="{{ pk.team }}">{{ pk.team|team_short }}</span>
+                {% endif %}
+              {% else %}
+                <span class="chip placeholder inline-flex items-center justify-center w-24">—</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
