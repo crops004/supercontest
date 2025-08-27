@@ -37,12 +37,12 @@ def standings():
     Combined standings:
       - Header shows displayed week with left/right arrows (clamped to [min_week, current_week])
       - Each row = user
-        * 5 picks for displayed week: show user’s own picks pre‑kickoff; others show '—' until kickoff
+        * 5 picks for displayed week: show user’s own picks pre-kickoff; others show '—' until kickoff
         * This Week W-L-P (only graded picks)
         * Overall W-L-P through displayed week (only games that have started)
         * Points = 1/win, 0.5/push
     """
-     # --- small helpers (scoped here for clarity) ---
+    # --- small helpers (scoped here for clarity) ---
     def is_final(g: Game) -> bool:
         completed = getattr(g, "completed", None)
         if completed is not None:
@@ -79,23 +79,41 @@ def standings():
     week_param = request.args.get("week", type=int)
     display_week = cur_week if week_param is None else max(min_week, min(week_param, cur_week))
 
-    # --- users & name formatting ---
+    # --- users & name formatting (First or First L.) ---
     users = User.query.order_by(User.username.asc()).all()
 
-    def split_name(u: User):
-        raw = (getattr(u, "full_name", None) or u.username or "").strip()
-        parts = raw.split()
-        first = parts[0] if parts else u.username
-        last_initial = parts[1][0].upper() if len(parts) > 1 and parts[1] else None
+    def split_name(u: User) -> tuple[str, str | None]:
+        """
+        Returns (first, last_initial or None).
+        Falls back to username if first_name is missing.
+        """
+        first = (getattr(u, "first_name", None) or "").strip()
+        last  = (getattr(u, "last_name",  None) or "").strip()
+
+        if not first:
+            first = (u.username or "").strip()
+
+        last_initial = last[0].upper() if last else None
         return first, last_initial
 
     from collections import Counter
-    firsts, name_parts = [], {}
+
+    first_keys: list[str] = []
+    name_parts: dict[int, tuple[str, str | None]] = {}
+
     for u in users:
         fn, li = split_name(u)
-        firsts.append(fn)
         name_parts[u.id] = (fn, li)
-    first_counts = Counter(firsts)
+        first_keys.append(fn.casefold())
+
+    first_counts = Counter(first_keys)
+
+    def display_name_for(u: User) -> str:
+        fn, li = name_parts[u.id]
+        needs_initial = first_counts[fn.casefold()] > 1
+        if needs_initial and li:
+            return f"{fn} {li}."
+        return fn
 
     # --- data for this week ---
     games_this_week: List[Game] = Game.query.filter_by(week=display_week).all()
@@ -197,17 +215,15 @@ def standings():
             elif pts == 0.0:
                 season_L += 1
 
-        fn, li = name_parts[u.id]
-        display_name = f"{fn} {li}." if first_counts[fn] > 1 and li else fn
+        display_name = display_name_for(u)
 
         rows.append({
             "user_id": u.id,
             "username": u.username,
-            "full_name": getattr(u, "full_name", None),
             "display_name": display_name,
             "weekly_picks": weekly_picks,
             "week_WLP": (weekly_W, weekly_L, weekly_P),
-            "season_WLP": (season_W, season_P, season_L) if False else (season_W, season_L, season_P),  # keep your original order
+            "season_WLP": (season_W, season_L, season_P),  # keep your original order
             "points": season_points,
         })
 

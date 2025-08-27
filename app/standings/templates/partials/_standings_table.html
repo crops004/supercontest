@@ -39,13 +39,13 @@
           <td class="px-4 py-3">
             {% set s = p.status %}
             {% if p.label and s in ['win','loss','push','pending'] %}
-              <span class="chip {{ s }}" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
+              <span class="chip {{ s }} w-24" title="{{ p.label }}">{{ p.label|team_short }}</span>
             {% elif p.label and s == 'pre' %}
-              <span class="chip pending" title="{{ p.label }}">{{ p.label|abbr_team }}</span>
+              <span class="chip pending w-24" title="{{ p.label }}">{{ p.label|team_short }}</span>
             {% elif s == 'hidden' %}
-              <span class="chip placeholder" title="Hidden until lock">?</span>
+              <span class="chip placeholder w-24" title="Hidden until lock">?</span>
             {% else %}
-              <span class="chip placeholder" title="No pick yet">?</span>
+              <span class="chip placeholder w-24" title="No pick yet">?</span>
             {% endif %}
           </td>
         {% endfor %}

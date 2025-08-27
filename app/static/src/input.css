@@ -4,7 +4,7 @@
 @layer components {
   /* base chip */
   .chip {
-    @apply inline-flex items-center rounded-lg border px-2 py-1 leading-none font-medium
+    @apply inline-flex items-center justify-center rounded-lg border px-2 py-1 leading-none font-medium
            text-[11px] md:text-xs border-border bg-foreground text-copy-light;
   }
 

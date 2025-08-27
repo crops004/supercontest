@@ -14,19 +14,19 @@
     </form>
 
     <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-success text-success-content hover:opacity-90 border border-border">
+      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
         Import Scores (last 3 days)
       </button>
     </form>
 
     <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
         Lock Weeks Through Current
       </button>
     </form>
 
     <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}" class="inline">
-      <button class="px-4 py-2 rounded-lg bg-secondary text-secondary-content hover:bg-secondary-dark border border-border">
+      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
         Refresh Spreads (Unlocked Only)
       </button>
     </form>
@@ -43,7 +43,7 @@
 
     <!-- Thu/Sun/Mon nights -->
     <form action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}" method="post" class="inline">
-      <button type="submit" class="px-4 py-2 rounded-lg bg-success text-success-content hover:opacity-90 border border-border">
+      <button type="submit" class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
         Update Scores + Finalize ATS (Week {{ selected_week }})
       </button>
     </form>

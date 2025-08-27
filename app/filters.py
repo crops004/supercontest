@@ -17,6 +17,29 @@ TEAM_ABBR = {
     "Los Angeles Chargers":"LAC","San Francisco 49ers":"SF","Tampa Bay Buccaneers":"TB",
 }
 
+ABBR_TO_CITY = {
+    # NFC
+    "ARI":"Arizona","ATL":"Atlanta","CAR":"Carolina","CHI":"Chicago","DAL":"Dallas",
+    "DET":"Detroit","GB":"Green Bay","LAR":"Los Angeles","MIN":"Minnesota","NO":"New Orleans",
+    "NYG":"New York","PHI":"Philadelphia","SF":"San Francisco","SEA":"Seattle","TB":"Tampa Bay",
+    "WAS":"Washington",
+    # AFC
+    "BAL":"Baltimore","BUF":"Buffalo","CIN":"Cincinnati","CLE":"Cleveland","DEN":"Denver",
+    "HOU":"Houston","IND":"Indianapolis","JAX":"Jacksonville","KC":"Kansas City","LV":"Las Vegas",
+    "LAC":"Los Angeles","MIA":"Miami","NE":"New England","NYJ":"New York","PIT":"Pittsburgh","TEN":"Tennessee",
+}
+
+# Optional: nickname -> city convenience (covers single-word inputs like "Eagles")
+NICK_TO_CITY = {
+    "Cardinals":"Arizona","Falcons":"Atlanta","Panthers":"Carolina","Bears":"Chicago","Cowboys":"Dallas",
+    "Lions":"Detroit","Packers":"Green Bay","Rams":"Los Angeles","Vikings":"Minnesota","Saints":"New Orleans",
+    "Giants":"New York","Eagles":"Philadelphia","49ers":"San Francisco","Seahawks":"Seattle","Buccaneers":"Tampa Bay",
+    "Commanders":"Washington","Football Team":"Washington","Redskins":"Washington",
+    "Ravens":"Baltimore","Bills":"Buffalo","Bengals":"Cincinnati","Browns":"Cleveland","Broncos":"Denver",
+    "Texans":"Houston","Colts":"Indianapolis","Jaguars":"Jacksonville","Chiefs":"Kansas City","Raiders":"Las Vegas",
+    "Chargers":"Los Angeles","Dolphins":"Miami","Patriots":"New England","Jets":"New York","Steelers":"Pittsburgh","Titans":"Tennessee",
+}
+
 # ---- Filters ----
 def team_short(name: Optional[str]) -> str:
     """Last word of team name ('Washington Commanders' -> 'Commanders')."""
@@ -55,6 +78,31 @@ def fmt_spread(value) -> str:
         return ""
     v = float(value)
     return str(int(v)) if v.is_integer() else f"{v:.1f}"
+
+def team_city(name: Optional[str]) -> str:
+    """
+    Return the full city/region part of a team name.
+    Examples:
+      "Philadelphia Eagles" -> "Philadelphia"
+      "Los Angeles Chargers" -> "Los Angeles"
+      "Eagles" -> "Philadelphia" (via NICK_TO_CITY)
+      "PHI" -> "Philadelphia" (via ABBR_TO_CITY)
+    """
+    if not name:
+        return ""
+    n = name.strip()
+
+    # Abbreviation input (e.g., "PHI", "LAR")
+    if n.isupper() and len(n) <= 4:
+        return ABBR_TO_CITY.get(n, n)
+
+    parts = n.split()
+    if len(parts) >= 2:
+        # Full name: everything except the last token (nickname) is the city/region
+        return " ".join(parts[:-1])
+
+    # Single word input like "Eagles"
+    return NICK_TO_CITY.get(n, n)
 
 # ----- Chip helpers -----
 # Map both internal result labels and ATS strings to a canonical class key
@@ -98,6 +146,7 @@ def register_template_utils(app):
     app.add_template_filter(abbr_team,  "abbr_team")
     app.add_template_filter(fmt_spread, "fmt_spread")
     app.add_template_filter(chip_class, "chip_class")
-    app.add_template_filter(chip_tw,    "chip_tw")       
+    app.add_template_filter(chip_tw,    "chip_tw")  
+    app.add_template_filter(team_city,  "team_city")     
     # Globals
     app.add_template_global(is_pickem,  "is_pickem")
