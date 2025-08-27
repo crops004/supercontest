@@ -56,34 +56,44 @@
 {% endblock %}
 
 {% block scripts %}
-  {{ super() }}
-  <script>
-  (function() {
+{{ super() }}
+<script>
+  (() => {
+    const weekSel = document.getElementById('admin-lines-week');
     const container = document.getElementById('admin-lines');
-    const weekSel   = document.getElementById('admin-lines-week');
-    const statusEl  = document.getElementById('admin-lines-status');
-    const userTZ    = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const statusEl = document.getElementById('admin-lines-status');
 
-    async function loadAdminLines(w) {
-      if (!container) return;
-      statusEl.textContent = 'Loading…';
+    function getTZ() {
+      try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+      catch { return 'UTC'; }
+    }
+
+    async function loadAdminLines() {
+      const week = parseInt(weekSel?.value || '0', 10);
+      const url = "{{ url_for('admin.admin_lines_fragment') }}"
+        + "?week=" + encodeURIComponent(week)
+        + "&tz=" + encodeURIComponent(getTZ());
+
       try {
-        const url = "{{ url_for('admin.admin_lines_fragment') }}" +
-                    "?week=" + encodeURIComponent(w) +
-                    "&tz=" + encodeURIComponent(userTZ);
+        statusEl.textContent = 'Loading…';
         const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
-        const html = await res.text();
-        if (!res.ok) throw new Error(html || ('Failed to load week ' + w));
-        container.innerHTML = html;
+        const body = await res.text();
+        if (!res.ok) {
+          console.error('[admin preview] HTTP', res.status, body);
+          throw new Error(`HTTP ${res.status}`);
+        }
+        container.innerHTML = body;
         statusEl.textContent = '';
-      } catch (e) {
+      } catch (err) {
+        console.error('[admin preview] failed:', err);
+        container.innerHTML = '';
         statusEl.textContent = 'Failed to load lines.';
-        console.error(e);
       }
     }
 
-    weekSel?.addEventListener('change', () => loadAdminLines(weekSel.value));
-    if (weekSel) loadAdminLines(weekSel.value);
+    weekSel?.addEventListener('change', loadAdminLines);
+    loadAdminLines(); // initial
   })();
-  </script>
+</script>
+
 {% endblock %}

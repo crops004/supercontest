@@ -1,7 +1,7 @@
 # app/admin/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app
 from flask_login import login_required
 from datetime import datetime, timezone, date
 from collections import defaultdict, OrderedDict
@@ -268,35 +268,73 @@ def picks_matrix():
 @login_required
 def admin_lines_fragment():
     week = request.args.get("week", type=int) or 0
-    tzname = request.args.get("tz")
+    tzname = (request.args.get("tz") or "").strip() or "UTC"
 
-    games = Game.query.filter(Game.week == week).order_by(Game.kickoff_at.asc(), Game.id.asc()).all()
-    game_ids = [g.id for g in games]
-    ats_rows = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids)).all() if game_ids else []
-    ats_by_game = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows}
+    try:
+        current_app.logger.info("[admin_lines_fragment] start week=%s tz=%s", week, tzname)
 
-    days: "OrderedDict[tuple, dict]" = OrderedDict()
-    for g in games:
-        day_title, day_sort = day_key(g.kickoff_at, tzname)
-        times = days.setdefault((day_title, day_sort), OrderedDict())
-        time_title, time_sort = time_key(g.kickoff_at, tzname)
-        times.setdefault((time_title, time_sort), []).append(g)
+        games = (
+            Game.query
+            .filter(Game.week == week)
+            .order_by(Game.kickoff_at.asc(), Game.id.asc())
+            .all()
+        )
+        current_app.logger.info("[admin_lines_fragment] games=%d", len(games))
 
-    groups = []
-    for (day_title, _), times in days.items():
-        groups.append((day_title, [(t[0], items) for t, items in times.items()]))
+        game_ids = [g.id for g in games]
+        ats_rows = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids)).all() if game_ids else []
+        current_app.logger.info("[admin_lines_fragment] ats_rows=%d", len(ats_rows))
 
-    return render_template(
-        "partials/_weekly_lines_list.html",
-        groups=groups,
-        picks_by_game={},
-        now_utc=datetime.now(timezone.utc),
-        disable_inputs=True,
-        ats_by_game=ats_by_game,
-        tzname=tzname,
-        abbr_team=abbr_team,
-    )
+        # Build a quick lookup for home/away by game id
+        by_id = {g.id: g for g in games}
 
+        # Normalize ATS → 'W' | 'L' | 'P'
+        to_wlp = {'COVER': 'W', 'NO_COVER': 'L', 'PUSH': 'P'}
+        ats_resolved = {}  # {(game_id, 'home'|'away'): 'W'|'L'|'P'|None}
+
+        for r in ats_rows:
+            g = by_id.get(r.game_id)
+            if not g:
+                continue
+            raw = (r.ats_result or '').upper()
+            wlp = to_wlp.get(raw) if raw else None
+            if r.team == g.home_team:
+                ats_resolved[(g.id, 'home')] = wlp
+            elif r.team == g.away_team:
+                ats_resolved[(g.id, 'away')] = wlp
+            # else: ignore unexpected team string
+
+        # Group games by day/time (uses tz)
+        from collections import OrderedDict
+        days = OrderedDict()
+        for g in games:
+            day_title, day_sort = day_key(g.kickoff_at, tzname)
+            times = days.setdefault((day_title, day_sort), OrderedDict())
+            time_title, time_sort = time_key(g.kickoff_at, tzname)
+            times.setdefault((time_title, time_sort), []).append(g)
+
+        groups = []
+        for (day_title, _), times in days.items():
+            groups.append((day_title, [(t[0], items) for t, items in times.items()]))
+
+        current_app.logger.info("[admin_lines_fragment] groups=%d", len(groups))
+
+        html = render_template(
+            "partials/_weekly_lines_list.html",
+            groups=groups,
+            picks_by_game={},                   # read-only preview in admin
+            now_utc=datetime.now(timezone.utc),
+            disable_inputs=True,
+            ats_resolved=ats_resolved,          # ✅ what the partial expects
+            tzname=tzname,
+            abbr_team=abbr_team,
+        )
+        current_app.logger.info("[admin_lines_fragment] render OK")
+        return html
+
+    except Exception:
+        current_app.logger.exception("[admin_lines_fragment] failed week=%s tz=%s", week, tzname)
+        return "Fragment error", 500
 
 # ------------------------------------------------------------
 # DB Manager (unchanged from earlier message)
