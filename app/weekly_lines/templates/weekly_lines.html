@@ -6,32 +6,12 @@
 <style>
   /* Tiny helper for a shake on over-limit */
   @keyframes pick-shake {
-
-    10%,
-    90% {
-      transform: translateX(-1px);
-    }
-
-    20%,
-    80% {
-      transform: translateX(2px);
-    }
-
-    30%,
-    50%,
-    70% {
-      transform: translateX(-4px);
-    }
-
-    40%,
-    60% {
-      transform: translateX(4px);
-    }
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
   }
-
-  .shake {
-    animation: pick-shake 400ms;
-  }
+  .shake { animation: pick-shake 400ms; }
 </style>
 {% endblock %}
 
@@ -60,11 +40,9 @@
     </div>
   </div>
 
-  {% if all_locked is defined and not all_locked %}
-    <div class="mb-3 text-sm text-copy-lighter">
-      Spreads for Week {{ selected_week }} aren’t locked yet. You can browse the matchups; spreads will appear once they’re locked.
-    </div>
-  {% endif %}
+  <!-- NEW: dynamic lock notice placeholder + initial flag -->
+  <div id="lock-note" class="mb-3 text-sm text-copy-lighter hidden"></div>
+  <div id="initial-lock-flag" data-all-locked="{{ 1 if all_locked else 0 }}" class="hidden"></div>
 
   <div class="relative bg-background">
     <!-- Form wrapper kept for non-JS fallback -->
@@ -105,10 +83,6 @@
 <script>
 /* ========================================================================== *
  * Weekly Lines: Client-Side Logic
- * - Single delegated chip handler (bound once) to avoid double-binding
- * - Selection model + 5-pick cap (accounting for locked games)
- * - Fragment loading per week
- * - Footer “Your picks this week” live update after submit
  * ========================================================================== */
 
 /* ---------- DOM refs ---------- */
@@ -124,6 +98,7 @@ const floatBtn       = document.getElementById('float-submit');
 const fallbackHidden = document.getElementById('fallback-hidden-inputs');
 const navEl          = document.querySelector('nav');
 const weekControls   = document.getElementById('week-controls');
+const lockNoteEl     = document.getElementById('lock-note');
 
 /* ---------- Timezone ---------- */
 const detectedTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -149,17 +124,15 @@ function currentWeek() {
   const v3 = parseInt((ds && ds.selectedWeek) || "", 10);
   if (Number.isFinite(v3)) return v3;
 
-  return 0; // will trigger server-side error if truly missing
+  return 0;
 }
 
-/** Build list of week options from the select. */
+/** Enable/disable pager buttons. */
 function getWeekOptions() {
   return Array.from(weekEl.options)
     .map(o => parseInt(o.value, 10))
     .filter(n => !Number.isNaN(n));
 }
-
-/** Enable/disable pager buttons. */
 function updatePagerDisabled() {
   const weeks = getWeekOptions();
   const cur = parseInt(weekEl.value, 10);
@@ -186,11 +159,23 @@ function setDirty(isDirty) {
   }
 }
 
+/* ---------- NEW: dynamic lock banner ---------- */
+function setLockBanner(allLocked) {
+  if (!lockNoteEl) return;
+  if (allLocked) {
+    lockNoteEl.classList.add('hidden');
+    lockNoteEl.textContent = '';
+  } else {
+    const wk = currentWeek();
+    lockNoteEl.textContent = `Spreads for Week ${wk} aren’t locked yet. You can browse the matchups; spreads will appear once they’re locked.`;
+    lockNoteEl.classList.remove('hidden');
+  }
+}
+
 /* ========================================================================== *
  * Selection model (chips)
  * ========================================================================== */
 
-/** Return list of selected values as "gameId::Team Name". */
 function collectSelectionsFromUI() {
   const chips = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]');
   const picks = [];
@@ -202,8 +187,6 @@ function collectSelectionsFromUI() {
   });
   return picks;
 }
-
-/** Keep fallback hidden inputs in sync (non-JS POST). */
 function syncFallbackHiddenInputs() {
   if (!fallbackHidden) return;
   fallbackHidden.innerHTML = '';
@@ -216,45 +199,33 @@ function syncFallbackHiddenInputs() {
     fallbackHidden.appendChild(input);
   });
 }
-
-/** Visual + aria toggling for a chip. */
 function setChipPressed(chip, pressed) {
   chip.setAttribute('aria-pressed', pressed ? 'true' : 'false');
   chip.classList.toggle('picked', !!pressed);
   const row = chip.closest('[data-team-row]');
   if (row) row.setAttribute('data-picked', pressed ? '1' : '0');
 }
-
-/** Unpress other chip in the same game. */
 function unpressSiblings(chip) {
   const gid = chip.getAttribute('data-game');
   const sibs = gamesEl.querySelectorAll(`[data-role="spread-chip"][data-game="${gid}"]`);
   sibs.forEach(s => { if (s !== chip) setChipPressed(s, false); });
 }
-
-/** Count already-picked *locked* games (from saved state). */
 function computeAlreadyLockedCount() {
   const savedLocked = gamesEl.querySelectorAll('[data-card][data-locked="1"] [data-team-row][data-picked="1"]');
   const gameSet = new Set();
   savedLocked.forEach(el => gameSet.add(el.closest('[data-card]').getAttribute('data-game')));
   return gameSet.size;
 }
-
-/** Count currently selected (unlocked) games. */
 function currentSelectedCount() {
   const selected = gamesEl.querySelectorAll('[data-role="spread-chip"][aria-pressed="true"]:not([data-locked-chip="1"])');
   const gameSet = new Set();
   selected.forEach(ch => gameSet.add(ch.getAttribute('data-game')));
   return gameSet.size;
 }
-
-/** Toggle handler with per-game exclusivity and 5-cap. */
 function tryToggleChip(chip) {
   if (chip.getAttribute('data-disabled') === '1') return;
-
   const wasPressed = chip.getAttribute('aria-pressed') === 'true';
 
-  // Unselect path (toggle off)
   if (wasPressed) {
     setChipPressed(chip, false);
     setDirty(true);
@@ -262,42 +233,40 @@ function tryToggleChip(chip) {
     cacheSelections();
     return;
   }
-
-  // Enforce one per game
   unpressSiblings(chip);
 
-  // Enforce 5-cap after counting already-locked picks
   const lockedExisting = computeAlreadyLockedCount();
   const cap = Math.max(0, 5 - lockedExisting);
   const before = currentSelectedCount();
   if (before >= cap) {
     chip.classList.add('shake');
     setTimeout(() => chip.classList.remove('shake'), 450);
-    statusEl.textContent = `You can only have ${cap} more pick${cap === 1 ? '' : 's'} this week.`;
+    if (window.renderToasts) {
+      window.renderToasts([["warning", "Max of 5 picks per week"]]);
+    } else {
+      alert("Max of 5 picks per week");
+    }
     return;
   }
 
-  // Select path
   setChipPressed(chip, true);
   setDirty(true);
   syncFallbackHiddenInputs();
   cacheSelections();
 }
 
-/* ---------- ONE-TIME delegated listeners (avoid double-binding) ---------- */
+/* ---------- ONE-TIME delegated listeners ---------- */
 let chipDelegationBound = false;
 function bindChipDelegationOnce() {
   if (chipDelegationBound || !gamesEl) return;
   chipDelegationBound = true;
 
-  // Click delegation
   gamesEl.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-role="spread-chip"]');
     if (!chip || !gamesEl.contains(chip)) return;
     tryToggleChip(chip);
   });
 
-  // Keyboard delegation (Enter/Space)
   gamesEl.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const chip = e.target.closest('[data-role="spread-chip"]');
@@ -306,8 +275,6 @@ function bindChipDelegationOnce() {
     tryToggleChip(chip);
   });
 }
-
-/** Normalize initial visual/aria state AFTER fragment loads. */
 function attachChipHandlers() {
   gamesEl.querySelectorAll('[data-role="spread-chip"]').forEach(chip => {
     const pressed = chip.getAttribute('aria-pressed') === 'true';
@@ -316,7 +283,7 @@ function attachChipHandlers() {
 }
 
 /* ========================================================================== *
- * Sticky/formatting helpers (headers, offsets)
+ * Sticky/formatting helpers
  * ========================================================================== */
 
 function measureHeights() {
@@ -324,7 +291,6 @@ function measureHeights() {
   const wcH  = weekControls?.offsetHeight || 48;
   return { navH, wcH, pad: 0 };
 }
-
 function applyStickyOffsets() {
   const { navH, wcH } = measureHeights();
   if (weekControls) weekControls.style.top = `${navH}px`;
@@ -336,8 +302,6 @@ function applyStickyOffsets() {
     h2.classList.add('z-20', 'bg-background', 'px-2', 'py-2', 'mt-2', 'text-copy-light');
   });
 }
-
-/** Format headers like "Sunday (9/1)" based on ISO & TZ. */
 function decorateDayHeaders() {
   const headers = document.querySelectorAll('[data-header="day"]');
   headers.forEach(h => {
@@ -386,13 +350,18 @@ async function loadWeek(w) {
     updatePagerDisabled();
     updateHiddenContext();
 
-    // IMPORTANT: normalize after each fragment load (no re-binding of listeners)
+    // Normalize after each fragment load
     attachChipHandlers();
 
     requestAnimationFrame(() => {
       decorateDayHeaders();
       applyStickyOffsets();
     });
+
+    // NEW: pull all_locked flag from the fragment and update notice
+    const flagEl = gamesEl.querySelector('#locks-flag');
+    const allLocked = flagEl ? (flagEl.dataset.allLocked === '1') : true;
+    setLockBanner(allLocked);
 
     restoreSelectionsFromCache();
     syncFallbackHiddenInputs();
@@ -408,9 +377,7 @@ async function loadWeek(w) {
  * ========================================================================== */
 
 function restoreSelectionsFromCache() {
-  // If server rendered any picks, trust them and skip cache restore
   if (gamesEl.querySelector('[data-role="spread-chip"][aria-pressed="true"]')) return;
-
   const wk = currentWeek();
   try {
     const raw = localStorage.getItem(storageKey(wk));
@@ -438,23 +405,17 @@ function clearCacheForWeek(wk) {
  * Footer: "Your picks this week" live renderer
  * ========================================================================== */
 
-/** Render the footer picks chips immediately after a successful submit. */
 function renderFooterPicks(committed, cap = 5) {
   const list = document.getElementById('footer-picks-list');
   if (!list) return;
-
   const picks = Array.isArray(committed) ? committed.slice(0, cap) : [];
   list.innerHTML = '';
-
-  // Committed picks
   for (const { abbr, team } of picks) {
     const el = document.createElement('span');
     el.className = 'chip';
     el.textContent = (abbr && abbr.trim()) ? abbr : team;
     list.appendChild(el);
   }
-
-  // Fill placeholders
   for (let i = picks.length; i < cap; i++) {
     const ph = document.createElement('span');
     ph.className = 'chip placeholder';
@@ -464,14 +425,12 @@ function renderFooterPicks(committed, cap = 5) {
 }
 
 /* ========================================================================== *
- * Submit handler (AJAX → replace unlocked picks for the week)
+ * Submit handler (AJAX)
  * ========================================================================== */
 
 floatBtn?.addEventListener('click', async () => {
   const picks = collectSelectionsFromUI();
   const wk = currentWeek();
-  console.log('[submit] week=', wk, 'picks=', picks);
-
   statusEl.textContent = 'Saving…';
   floatBtn.disabled = true;
 
@@ -483,7 +442,7 @@ floatBtn?.addEventListener('click', async () => {
     });
 
     let data = {};
-    try { data = await res.json(); } catch { /* ignore parse error */ }
+    try { data = await res.json(); } catch {}
 
     if (!res.ok || !data.ok) {
       statusEl.textContent = (data && data.error) ? data.error : `Save failed (${res.status}).`;
@@ -491,15 +450,12 @@ floatBtn?.addEventListener('click', async () => {
       return;
     }
 
-    // ✅ Update footer immediately using DB-confirmed truth
     renderFooterPicks(data.committed_picks || []);
-
     statusEl.textContent = `Saved ${data.saved} pick${data.saved === 1 ? '' : 's'}.`;
     setDirty(false);
     floatBtn.disabled = false;
     clearCacheForWeek(wk);
 
-    // Refresh the games grid (locks, badges, picked state)
     loadWeek(wk);
   } catch (e) {
     console.error(e);
@@ -516,7 +472,6 @@ function initAfterRender() {
   updateHiddenContext();
   updatePagerDisabled();
 
-  // Bind delegation ONCE for page lifetime, then only normalize on loads
   bindChipDelegationOnce();
   attachChipHandlers();
 
@@ -525,12 +480,16 @@ function initAfterRender() {
     applyStickyOffsets();
   });
 
+  // Initial banner state from full-page render
+  const initialFlag = document.getElementById('initial-lock-flag');
+  const allLocked = initialFlag ? (initialFlag.dataset.allLocked === '1') : true;
+  setLockBanner(allLocked);
+
   restoreSelectionsFromCache();
   syncFallbackHiddenInputs();
   setDirty(false);
 }
 
-// Pager events
 weekEl.addEventListener('change', e => loadWeek(e.target.value));
 document.getElementById('prev')?.addEventListener('click', () => {
   const weeks = getWeekOptions();
@@ -549,18 +508,14 @@ document.getElementById('next')?.addEventListener('click', () => {
   }
 });
 
-// Window resize → resticky headers
 window.addEventListener('resize', () => {
   decorateDayHeaders();
   applyStickyOffsets();
 }, { passive: true });
 
-// First-run init
 initAfterRender();
 
-// If tz not present in URL, reload once to lock it in
 const qs = new URLSearchParams(window.location.search);
 if (!qs.has('tz')) setTimeout(() => loadWeek(weekEl.value), 0);
-
 </script>
 {% endblock %}

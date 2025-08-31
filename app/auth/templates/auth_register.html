@@ -12,7 +12,8 @@
       <h1 class="text-xl font-semibold text-copy">Create account</h1>
       <p class="mt-1 text-sm text-copy-light">Join the contest and start making picks.</p>
 
-      <form method="POST" class="mt-6 space-y-4" novalidate>
+      <!-- Removed `novalidate` so browser-native validation runs -->
+      <form method="POST" class="mt-6 space-y-4">
         <!-- Username -->
         <div>
           <label for="username" class="block text-sm text-copy-lighter mb-1">Username</label>
@@ -31,8 +32,8 @@
 
         <!-- Email -->
         <div>
-          <label for="email" class="block text-sm text-copy-lighter mb-1">Email (optional)</label>
-          <input id="email" name="email" type="email" autocomplete="email"
+          <label for="email" class="block text-sm text-copy-lighter mb-1">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required
             class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
                    focus:outline-none focus:ring-2 focus:ring-primary/40">
         </div>

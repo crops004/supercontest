@@ -1,6 +1,8 @@
 {% set disable = disable_inputs|default(false) %}
 {% set show_spreads = all_locked|default(false) %}
 
+<div id="locks-flag" data-all-locked="{{ 1 if all_locked else 0 }}" class="hidden"></div>
+
 {# ===================== ATS-colored score badge ===================== #}
 {# Displays the numeric score but colors by ATS result: 'W'|'L'|'P'|None #}
 {% macro score_badge_ats(result, val) -%}
