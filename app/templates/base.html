@@ -73,6 +73,23 @@
     </div>
   </nav>
 
+  {# ----------------------------- PICKS BANNER ----------------------------- #}
+  {% set _pb = picks_banner if picks_banner is defined else {'show': False} %}
+  {% if _pb.show %}
+    <div id="picks-banner" class="bg-red-600 text-white">
+      <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <div>
+          <span class="font-semibold">Picks not finalized for Week <span id="picks-banner-week">{{ _pb.current_week }}</span></span>
+          <span class="opacity-90"> — <span id="picks-banner-remaining">{{ _pb.remaining }}</span> more to submit.</span>
+        </div>
+        <a id="picks-banner-link" href="{{ _pb.link }}" class="underline font-medium">Make picks →</a>
+      </div>
+    </div>
+  {% else %}
+    <div id="picks-banner" class="hidden"></div>
+  {% endif %}
+  {# ----------------------------------------------------------------------- #}
+
   <!-- Main content -->
   <main class="min-h-[70vh] pb-16 md:pb-16">
     {% block content %}{% endblock %}
@@ -175,6 +192,41 @@
         var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         apply(isDark ? 'light' : 'dark');
       });
+    })();
+
+    // --- Picks banner refresher (works with /api/picks/status if present) ---
+    (function () {
+      function $(sel) { return document.querySelector(sel); }
+      function renderBanner(data) {
+        const root = $("#picks-banner");
+        const wkEl = $("#picks-banner-week");
+        const remEl = $("#picks-banner-remaining");
+        if (!root) return;
+
+        if (!data || data.finalized || !data.show) {
+          root.classList.add("hidden");
+          return;
+        }
+        root.classList.remove("hidden");
+        if (wkEl) wkEl.textContent = data.current_week ?? "";
+        if (remEl) remEl.textContent = data.remaining ?? "";
+        // We intentionally keep the link href as rendered server-side.
+      }
+
+      window.refreshPicksBanner = async function () {
+        try {
+          const res = await fetch("/api/picks/status", { credentials: "same-origin" });
+          if (!res.ok) return;
+          const json = await res.json();
+          renderBanner(json);
+        } catch (_) { /* silent */ }
+      };
+
+      // Refresh on page show / tab focus (nice for SPA-like flows)
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") window.refreshPicksBanner();
+      });
+      window.addEventListener("pageshow", () => window.refreshPicksBanner());
     })();
 
     // Toasts (palette-aware)

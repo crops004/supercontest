@@ -74,10 +74,25 @@ def abbr_team(name: Optional[str]) -> str:
     return n[:3].upper()
 
 def fmt_spread(value) -> str:
-    if value is None:
+    """
+    Formats a point spread with a leading sign:
+    -3.5 stays "-3.5", +3.5 shows as "+3.5", integers drop .0 ("+3" / "-3").
+    """
+    if value is None or value == "":
         return ""
-    v = float(value)
-    return str(int(v)) if v.is_integer() else f"{v:.1f}"
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        # If it's already a label like "PK" or "EVEN", pass it through
+        return str(value).strip()
+
+    # If you prefer PK for zero, swap the next line for: return "PK"
+    if abs(v) < 1e-9:
+        return "0"
+
+    if v.is_integer():
+        return f"{v:+.0f}"   # "+3" or "-3"
+    return f"{v:+.1f}"       # "+3.5" or "-3.5"
 
 def team_city(name: Optional[str]) -> str:
     """
