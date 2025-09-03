@@ -6,6 +6,16 @@
   <title>{% block title %}Supercontest{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Provide safe defaults so sticky offsets always exist -->
+  <style>
+    :root {
+    --h-nav: 52px;
+    --h-picks: 0px;
+    --h-billing: 0px;
+    --h-week: 0px;
+  }
+  </style>
+
   <!-- Apply saved theme BEFORE CSS to avoid flashes -->
   <script>
     (function () {
@@ -73,13 +83,20 @@
     </div>
   </nav>
 
-  {# ----------------------------- PICKS BANNER ----------------------------- #}
+ {# ----------------------------- BANNERS ----------------------------- #}
   {% set _pb = picks_banner if picks_banner is defined else {'show': False} %}
+  {% set _bb = billing_banner if billing_banner is defined else {'show': False} %}
+
+  {# Picks banner (red) #}
   {% if _pb.show %}
-    <div id="picks-banner" class="bg-red-600 text-white">
+    <div id="picks-banner"
+        class="sticky z-35 bg-primary text-copy border-b border-border shadow-md shadow-secondary/10"
+        style="top: var(--h-nav);">
       <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
         <div>
-          <span class="font-semibold">Picks not finalized for Week <span id="picks-banner-week">{{ _pb.current_week }}</span></span>
+          <span class="font-semibold">Picks not finalized for Week
+            <span id="picks-banner-week">{{ _pb.current_week }}</span>
+          </span>
           <span class="opacity-90"> — <span id="picks-banner-remaining">{{ _pb.remaining }}</span> more to submit.</span>
         </div>
         <a id="picks-banner-link" href="{{ _pb.link }}" class="underline font-medium">Make picks →</a>
@@ -88,7 +105,24 @@
   {% else %}
     <div id="picks-banner" class="hidden"></div>
   {% endif %}
-  {# ----------------------------------------------------------------------- #}
+
+  {# Billing banner (amber) — only if unpaid #}
+  {% if _bb.show %}
+    <div id="billing-banner"
+        class="sticky z-32 bg-amber-500 text-amber-950 border-b border-amber-600"
+        style="top: calc(var(--h-nav) + var(--h-picks));">
+      <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <div class="font-medium">
+          Payment required to enter this week’s contest.
+        </div>
+        <a href="{{ _bb.link }}" class="underline font-semibold">Pay now →</a>
+      </div>
+    </div>
+  {% else %}
+    <div id="billing-banner" class="hidden"></div>
+  {% endif %}
+  {# ------------------------------------------------------------------- #}
+
 
   <!-- Main content -->
   <main class="min-h-[70vh] pb-16 md:pb-16">
@@ -205,12 +239,11 @@
 
         if (!data || data.finalized || !data.show) {
           root.classList.add("hidden");
-          return;
+        } else {
+          root.classList.remove("hidden");
+          if (wkEl) wkEl.textContent = data.current_week ?? "";
+          if (remEl) remEl.textContent = data.remaining ?? "";
         }
-        root.classList.remove("hidden");
-        if (wkEl) wkEl.textContent = data.current_week ?? "";
-        if (remEl) remEl.textContent = data.remaining ?? "";
-        // We intentionally keep the link href as rendered server-side.
       }
 
       window.refreshPicksBanner = async function () {
@@ -251,7 +284,69 @@
         setTimeout(close, 4200);
       });
     };
+
+    /* Unified sticky layout measurer:
+      Sets --h-nav, --h-picks, --h-billing, --h-week and keeps them current. */
+    (function () {
+      const root    = document.documentElement;
+      const nav     = document.querySelector('nav[role="navigation"]');
+      const picks   = document.getElementById('picks-banner');
+      const billing = document.getElementById('billing-banner');
+      // week-controls only exists on Lines page; if not found, it's fine.
+      const qWeek   = () => document.getElementById('week-controls');
+
+      function visible(el) { return !!(el && !el.classList.contains('hidden')); }
+
+      function setVars() {
+        const week = qWeek();
+        const hNav     = nav     ? nav.offsetHeight     || 0 : 0;
+        const hPicks   = visible(picks)   ? (picks.offsetHeight   || 0) : 0;
+        const hBilling = visible(billing) ? (billing.offsetHeight || 0) : 0;
+        const hWeek    = week    ? week.offsetHeight    || 0 : 0;
+
+        root.style.setProperty('--h-nav',     hNav + 'px');
+        root.style.setProperty('--h-picks',   hPicks + 'px');
+        root.style.setProperty('--h-billing', hBilling + 'px');
+        root.style.setProperty('--h-week',    hWeek + 'px');
+      }
+
+      // expose for manual calls if needed
+      window.recalcStickyLayout = setVars;
+
+      // Initial + lifecycle hooks
+      setVars();
+      window.addEventListener('resize', setVars);
+      window.addEventListener('pageshow', setVars);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') setVars();
+      });
+
+      // Observe size changes
+      if ('ResizeObserver' in window) {
+        if (nav)     new ResizeObserver(setVars).observe(nav);
+        if (picks)   new ResizeObserver(setVars).observe(picks);
+        if (billing) new ResizeObserver(setVars).observe(billing);
+        // week controls can render later (per-page), so observe the container body for it
+        new ResizeObserver(setVars).observe(document.body);
+      }
+
+      // Observe show/hide via class/style changes on banners
+      if ('MutationObserver' in window) {
+        if (picks)   new MutationObserver(setVars).observe(picks,   { attributes: true, attributeFilter: ['class', 'style'] });
+        if (billing) new MutationObserver(setVars).observe(billing, { attributes: true, attributeFilter: ['class', 'style'] });
+        // watch for week-controls insertion/removal
+        new MutationObserver(setVars).observe(document.body, { childList: true, subtree: true });
+      }
+
+      // Recompute after AJAX banner refresh
+      const orig = window.refreshPicksBanner;
+      window.refreshPicksBanner = async function () {
+        try { if (typeof orig === 'function') await orig(); }
+        finally { setVars(); }
+      };
+    })();
   </script>
+
 
   <!-- global flashes -->
   {% set flashes = get_flashed_messages(with_categories=True) %}

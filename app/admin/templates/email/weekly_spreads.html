@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Week {{ week_number }} Spreads</title>
+    <style>
+      @media only screen and (max-width: 620px) {
+        .container { width: 100% !important; padding: 0 12px !important; }
+        .spreads-table th, .spreads-table td { font-size: 14px !important; padding: 10px !important; }
+        .h1 { font-size: 22px !important; }
+        .cta { width: 100% !important; display: block !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0; padding:0; background:#0f0e13; color:#e9e7ee; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+    <!-- Preheader -->
+    <span style="display:none; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;">
+      Week {{ week_number }} spreads are live—make your 5 picks now.
+    </span>
+
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td align="center">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" class="container" style="width:600px; max-width:100%; margin:0 auto;">
+            <!-- Header -->
+            <tr>
+              <td style="padding:24px 20px; text-align:center;">
+                <div class="h1" style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:24px; font-weight:700; color:#e9e7ee;">
+                  Week {{ week_number }} NFL Spreads
+                </div>
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:#b8b4c7; margin-top:6px;">
+                  {{ week_date_range_text }}
+                </div>
+              </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+              <td style="padding:0 20px 20px;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:separate;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ weekly_lines_url }}" class="cta"
+                         style="background:#6f3ff5; color:#ffffff; text-decoration:none; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; padding:12px 18px; border-radius:8px; display:inline-block;">
+                        Make Your Picks
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Spreads table (stacked teams, home on bottom; times in MT via time_title) -->
+            <tr>
+              <td style="padding:0 20px 24px;">
+                {% set show_spreads = all_locked|default(false) %}
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="spreads-table"
+                       style="border-collapse:collapse; width:100%; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#14131b; border:1px solid #2a2836; border-radius:12px; overflow:hidden;">
+                  <thead>
+                    <tr style="background:#191826;">
+                      <th align="left" style="padding:12px 14px; font-size:12px; letter-spacing:.02em; color:#b8b4c7; text-transform:uppercase; border-bottom:1px solid #2a2836;">Day</th>
+                      <th align="left" style="padding:12px 14px; font-size:12px; letter-spacing:.02em; color:#b8b4c7; text-transform:uppercase; border-bottom:1px solid #2a2836;">Kickoff</th>
+                      <th align="left" style="padding:12px 14px; font-size:12px; letter-spacing:.02em; color:#b8b4c7; text-transform:uppercase; border-bottom:1px solid #2a2836;">Matchup</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for day_title, times in groups %}
+                      {% for time_title, items in times %}
+                        {% for g in items %}
+                          {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+                          {% set has_spread_actual = (g.spread_home is not none and g.spread_away is not none) %}
+                          {% set is_pk = (has_spread_actual and g.spread_home == 0 and g.spread_away == 0) %}
+                          {% set has_spread = (has_spread_actual and show_spreads) %}
+
+                          <tr>
+                            <!-- Day -->
+                            <td style="padding:12px 14px; font-size:14px; color:#e9e7ee; border-bottom:1px solid #2a2836; white-space:nowrap;">
+                              {{ day_title }}
+                            </td>
+
+                            <!-- Kickoff (ensure your time_key used MT; see note below) -->
+                            <td style="padding:12px 14px; font-size:14px; color:#e9e7ee; border-bottom:1px solid #2a2836; white-space:nowrap;">
+                              {{ time_title }}
+                              {% if locked %}
+                                <span style="display:inline-block; margin-left:8px; font-size:11px; color:#ff6b6b; border:1px solid #3a2e2e; border-radius:9999px; padding:2px 6px;">Locked</span>
+                              {% endif %}
+                            </td>
+
+                            <!-- Stacked teams + spreads (away top, home bottom) -->
+                            <td style="padding:12px 14px; font-size:14px; color:#e9e7ee; border-bottom:1px solid #2a2836;">
+                              <!-- AWAY line -->
+                              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+                                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">
+                                  {{ g.away_team }}
+                                </div>
+                                {% if not has_spread %}
+                                  <span style="opacity:.55;">—</span>
+                                {% else %}
+                                  {% if is_pk %}
+                                    <span style="display:inline-block; min-width:64px; text-align:center; padding:6px 10px; border:1px solid #2a2836; border-radius:9999px; font-size:14px;">PK</span>
+                                  {% else %}
+                                    <span style="display:inline-block; min-width:64px; text-align:center; padding:6px 10px; border:1px solid #2a2836; border-radius:9999px; font-size:14px;">
+                                      {{ g.spread_away | fmt_spread }}
+                                    </span>
+                                  {% endif %}
+                                {% endif %}
+                              </div>
+
+                              <!-- HOME line (home on bottom) -->
+                              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">
+                                  {{ g.home_team }}
+                                </div>
+                                {% if not has_spread %}
+                                  <span style="opacity:.55;">—</span>
+                                {% else %}
+                                  {% if is_pk %}
+                                    <span style="display:inline-block; min-width:64px; text-align:center; padding:6px 10px; border:1px solid #2a2836; border-radius:9999px; font-size:14px;">PK</span>
+                                  {% else %}
+                                    <span style="display:inline-block; min-width:64px; text-align:center; padding:6px 10px; border:1px solid #2a2836; border-radius:9999px; font-size:14px;">
+                                      {{ g.spread_home | fmt_spread }}
+                                    </span>
+                                  {% endif %}
+                                {% endif %}
+                              </div>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      {% endfor %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#9d98ad; margin-top:10px;">
+                  Times shown in {{ timezone_name }}. Spreads appear only once the week is locked in-app.
+                </div>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:16px 20px 32px; text-align:center;">
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#706a84; margin-top:8px;">
+                </div>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

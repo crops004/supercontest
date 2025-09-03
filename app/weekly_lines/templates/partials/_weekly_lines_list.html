@@ -28,7 +28,7 @@
     {% set first_iso   = first_game.kickoff_at.isoformat() if first_game and first_game.kickoff_at else '' %}
 
     <!-- Day header -->
-    <h2 class="font-semibold text-copy-light"
+    <h2 class="day-header font-semibold text-copy-light bg-background px-2 py-2 mt-2"
         data-header="day"
         data-title="{{ day_title }}"
         data-date-iso="{{ first_iso }}">{{ day_title }}</h2>
@@ -106,7 +106,8 @@
                              else 'push' if result_away == 'P'
                              else 'pending') if picked_away else 'pending' }}
                          {{ 'picked' if picked_away else '' }}
-                         {{ 'disabled' if away_disabled else '' }}"
+                         {{ 'disabled' if away_disabled else '' }}
+                          cursor-pointer"
                   role="button"
                   aria-pressed="{{ 'true' if picked_away else 'false' }}"
                   aria-label="Select {{ g.away_team }} spread"
@@ -153,7 +154,8 @@
                              else 'push' if result_home == 'P'
                              else 'pending') if picked_home else 'pending' }}
                          {{ 'picked' if picked_home else '' }}
-                         {{ 'disabled' if home_disabled else '' }}"
+                         {{ 'disabled' if home_disabled else '' }}
+                          cursor-pointer"
                   role="button"
                   aria-pressed="{{ 'true' if picked_home else 'false' }}"
                   aria-label="Select {{ g.home_team }} spread"

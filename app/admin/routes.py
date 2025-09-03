@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from datetime import datetime, timezone, date
 from collections import defaultdict, OrderedDict
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from urllib.parse import urlencode
 from sqlalchemy.sql import sqltypes as T
 
@@ -553,3 +553,128 @@ def db_update_cell(model_name, row_id):
     db.session.add(obj)
     db.session.commit()
     return jsonify({"ok": True})
+
+def get_tzname() -> str:
+    tz = getattr(current_user, "timezone", None)
+    return tz or "MT"
+
+def _to_sort_tuple(x: Any) -> tuple[int, Any]:
+    """
+    Normalize various potential sort-key types (date/datetime/str/None/number)
+    into a single comparable tuple. Lower tuple compares first.
+    Priority order:
+      0: datetime-like
+      1: numeric
+      2: string
+      9: None / unknown
+    """
+    if isinstance(x, datetime):
+        # sort by actual datetime
+        return (0, x)
+    if isinstance(x, date):
+        # convert date to datetime at midnight for stable ordering
+        return (0, datetime(x.year, x.month, x.day, tzinfo=timezone.utc))
+    if isinstance(x, (int, float)):
+        return (1, x)
+    if isinstance(x, str):
+        return (2, x)
+    if x is None:
+        return (9, 0)
+    # fallback to string representation
+    return (2, str(x))
+
+def _min_sort(a: tuple[int, Any] | None, b: Any) -> tuple[int, Any]:
+    """Return the min (normalized) of existing tuple vs new raw value."""
+    nb = _to_sort_tuple(b)
+    if a is None:
+        return nb
+    return a if a <= nb else nb
+
+def _group_games_for_email(games, tzname: str = "America/Denver"):
+    """
+    Returns the same structure your weekly_lines partial uses:
+    groups = [(day_title, [(time_title, [games])])]
+    """
+    by_day = {}
+    day_order = {}
+
+    for g in games:
+        dlabel, dsort = day_key(g.kickoff_at, tzname)
+        if dlabel not in by_day:
+            by_day[dlabel] = []
+            day_order[dlabel] = dsort
+        by_day[dlabel].append(g)
+
+    groups = []
+    for dlabel in sorted(by_day.keys(), key=lambda d: day_order[d]):
+        day_games = sorted(by_day[dlabel], key=lambda gg: (gg.kickoff_at or datetime.max.replace(tzinfo=timezone.utc), gg.id))
+
+        by_time = {}
+        time_order = {}
+
+        for g in day_games:
+            tlabel, tsort = time_key(g.kickoff_at, tzname)
+            if tlabel not in by_time:
+                by_time[tlabel] = []
+                time_order[tlabel] = tsort
+            by_time[tlabel].append(g)
+
+        times = [(t, by_time[t]) for t in sorted(by_time.keys(), key=lambda t: time_order[t])]
+        groups.append((dlabel, times))
+
+    return groups
+
+@bp.get("/email/weekly-spreads/preview")
+@login_required
+def preview_weekly_spreads_email():
+    """HTML preview in the browser (email-safe markup)."""
+    week = request.args.get("week", type=int) or current_week_number()
+    # Pull games for the week
+    games = (
+        db.session.query(Game)
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
+
+    groups = _group_games_for_email(games)
+
+    # Email context (match your template variables)
+    context = {
+        "groups": groups,
+        "all_locked": True,  # set True so spreads show; flip to your real flag if you want
+        "now_utc": datetime.now(timezone.utc),
+        "week_number": week,
+        "week_date_range_text": "",  # optional pretty range text if you have it
+        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        "timezone_name": "MT",  # if you track user TZ, swap it in
+        "current_year": datetime.now().year,
+    }
+
+    return render_template("email/weekly_spreads.html", **context)
+
+@bp.get("/email/weekly-spreads/preview.txt")
+@login_required
+def preview_weekly_spreads_text():
+    """Plain-text preview (multipart/alternative text part)."""
+    week = request.args.get("week", type=int) or current_week_number()
+    games = (
+        db.session.query(Game)
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
+    groups = _group_games_for_email(games)
+    context = {
+        "groups": groups,
+        "all_locked": True,
+        "now_utc": datetime.now(timezone.utc),
+        "ats_resolved": {},
+        "week_number": week,
+        "week_date_range_text": "",
+        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        "about_url": url_for("standings.standings", _external=True),
+        "timezone_name": "MT",
+        "current_year": datetime.now().year,
+    }
+    return render_template("email/weekly_spreads.txt", **context), 200, {"Content-Type": "text/plain; charset=utf-8"}

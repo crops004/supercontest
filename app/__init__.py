@@ -1,4 +1,4 @@
-from flask import Flask, request, current_app
+from flask import Flask, request, current_app, url_for
 from flask_login import current_user
 from config import get_config
 from datetime import datetime, timezone
@@ -81,6 +81,30 @@ def create_app():
     def load_user(user_id):
         from .models import User
         return User.query.get(int(user_id))
+
+    @app.context_processor
+    def inject_picks_banner():
+        """
+        Exposes `picks_banner` to all templates.
+        If anything errors, we fail closed (show=False) but log in DEBUG.
+        """
+        try:
+            if current_user.is_authenticated and current_app.config.get("SHOW_PICKS_BANNER", True):
+                picks_per_week = int(current_app.config.get("PICKS_PER_WEEK", 5))
+                remaining, wk = remaining_picks_this_week(current_user.id, picks_per_week)
+                return {
+                    "picks_banner": {
+                        "show": remaining > 0,
+                        "remaining": remaining,
+                        "current_week": wk,
+                        "link": url_for("weekly_lines.weekly_lines", week=wk),
+                    }
+                }
+        except Exception as e:
+            # Helpful in dev: see why it's not showing
+            if current_app.debug:
+                print("[picks_banner:error]", repr(e))
+        return {"picks_banner": {"show": False}}
 
     # --- Logging setup ---
     if not app.debug:  # only tweak for production

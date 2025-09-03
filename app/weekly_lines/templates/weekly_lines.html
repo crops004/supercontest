@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-  /* Tiny helper for a shake on over-limit */
+  /* Over-limit shake (unchanged) */
   @keyframes pick-shake {
     10%, 90% { transform: translateX(-1px); }
     20%, 80% { transform: translateX(2px); }
@@ -12,13 +12,29 @@
     40%, 60% { transform: translateX(4px); }
   }
   .shake { animation: pick-shake 400ms; }
+
+  /* Week controls sit below: NAV + (optional) PICKS + (optional) BILLING */
+  #week-controls {
+    position: sticky;
+    top: calc(var(--h-nav, 52px) + var(--h-picks, 0px) + var(--h-billing, 0px)) !important;
+    z-index: 25; /* nav 40, picks 35, billing 32, week 25 */
+  }
+
+  /* Day headers sit below week-controls as you scroll */
+  .day-header {
+    position: sticky;
+    top: calc(var(--h-nav, 52px) + var(--h-picks, 0px) + var(--h-billing, 0px) + var(--h-week, 0px)) !important;
+    z-index: 20;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-[1100px] mx-auto my-6 px-4 text-copy-light">
+<div class="max-w-[1100px] mx-auto mb-6 px-4 text-copy-light">
   <!-- Week Controls: sticky under the navbar -->
-  <div id="week-controls" class="sticky z-30 bg-background border-b border-border" style="top: 0;" data-selected-week="{{ selected_week }}">
+  <div id="week-controls"
+     class="sticky z-20 bg-background border-b border-border"
+     data-selected-week="{{ selected_week }}">
     <div class="flex items-center gap-2 py-2">
       <button id="prev"
         class="px-2 py-1 border border-border bg-background rounded hover:bg-foreground disabled:opacity-50 disabled:cursor-default"
@@ -286,21 +302,10 @@ function attachChipHandlers() {
  * Sticky/formatting helpers
  * ========================================================================== */
 
-function measureHeights() {
-  const navH = navEl?.offsetHeight || 56;
-  const wcH  = weekControls?.offsetHeight || 48;
-  return { navH, wcH, pad: 0 };
-}
 function applyStickyOffsets() {
-  const { navH, wcH } = measureHeights();
-  if (weekControls) weekControls.style.top = `${navH}px`;
-
-  const dayTop = navH + wcH;
-  document.querySelectorAll('[data-header="day"]').forEach(h2 => {
-    h2.style.position = 'sticky';
-    h2.style.top = `${dayTop}px`;
-    h2.classList.add('z-20', 'bg-background', 'px-2', 'py-2', 'mt-2', 'text-copy-light');
-  });
+  if (typeof window.recalcStickyLayout === 'function') {
+    window.recalcStickyLayout();
+  }
 }
 function decorateDayHeaders() {
   const headers = document.querySelectorAll('[data-header="day"]');
@@ -456,7 +461,18 @@ floatBtn?.addEventListener('click', async () => {
     floatBtn.disabled = false;
     clearCacheForWeek(wk);
 
-    loadWeek(wk);
+    // ✅ Update the picks banner instantly
+    if (typeof window.refreshPicksBanner === 'function') {
+      await window.refreshPicksBanner();
+    }
+
+    // Reload the games list (locked states, etc.)
+    await loadWeek(wk);
+
+    // Recalc sticky layout just in case heights changed
+    if (typeof window.recalcStickyLayout === 'function') {
+      window.recalcStickyLayout();
+    }
   } catch (e) {
     console.error(e);
     statusEl.textContent = 'Save failed.';

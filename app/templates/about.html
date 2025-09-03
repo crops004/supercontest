@@ -279,8 +279,8 @@
 
     const data = {
       title: document.title || 'Supercontest',
-      text: 'Join our NFL Supercontest! $52 entry ($2 to site), $100 to 2nd, rest to 1st. Pay by Week 4 or eliminated.',
-      url: window.location.origin + '{{ url_for("standings.standings") }}'
+      text: 'Join the NFL Supercontest! $52 entry, $100 to 2nd, rest to 1st ($2 site fee).',
+      url: window.location.origin + '{{ url_for("main.about") }}'
     };
 
     btn.addEventListener('click', async () => {
