@@ -30,6 +30,12 @@
       <div class="text-lg font-semibold mb-1">DB Management</div>
       <p class="text-sm text-copy-lighter">Browse tables and edit cells inline.</p>
     </a>
+
+    <a href="{{ url_for('admin.email_previews', week=selected_week) }}"
+        class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">Email Previews</div>
+      <p class="text-sm text-copy-lighter">Preview weekly spreads and standings emails.</p>
+    </a>
   </div>
 
   <!-- Weekly Lines preview on hub -->

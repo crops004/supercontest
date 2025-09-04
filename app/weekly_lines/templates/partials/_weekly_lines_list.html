@@ -1,5 +1,8 @@
+{# _weekly_lines_list.html (top) #}
+{% set admin_preview = admin_preview|default(false) %}
 {% set disable = disable_inputs|default(false) %}
-{% set show_spreads = all_locked|default(false) %}
+{% set show_spreads = (all_locked|default(false)) or admin_preview %}
+{% set header_bg = 'bg-foreground' if admin_preview else 'bg-background' %}
 
 <div id="locks-flag" data-all-locked="{{ 1 if all_locked else 0 }}" class="hidden"></div>
 
@@ -28,10 +31,18 @@
     {% set first_iso   = first_game.kickoff_at.isoformat() if first_game and first_game.kickoff_at else '' %}
 
     <!-- Day header -->
-    <h2 class="day-header font-semibold text-copy-light bg-background px-2 py-2 mt-2"
+    {# first game's ISO for header date #}
+    {% set first_block = times|first %}
+    {% set first_items = first_block[1] if first_block else [] %}
+    {% set first_game  = first_items|first if first_items else None %}
+    {% set first_iso   = first_game.kickoff_at.isoformat() if first_game and first_game.kickoff_at else '' %}
+
+    <h2 class="day-header font-semibold text-copy-light {{ header_bg }} px-2 py-2 mt-2"
         data-header="day"
         data-title="{{ day_title }}"
-        data-date-iso="{{ first_iso }}">{{ day_title }}</h2>
+        data-date-iso="{{ first_iso }}">
+      {{ first_game and (first_game.kickoff_at | fmt_local(tzname, 'date')) or day_title }}
+    </h2>
 
     <!-- Cards grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -77,7 +88,7 @@
 
               {# -------------------- AWAY -------------------- #}
               {% set picked_away   = (chosen == g.away_team) %}
-              {% set away_disabled = (disable or not has_spread or locked) %}
+              {% set away_disabled = (disable or not has_spread or locked) and not admin_preview %}
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_away else 0 }}">
@@ -98,16 +109,25 @@
                   </div>
                 </div>
 
+                {% set chip_classes = (
+                  'chip spread '
+                  ~ ( 'win'  if result_away == 'W'
+                      else 'loss' if result_away == 'L'
+                      else 'push' if result_away == 'P'
+                      else 'pending')
+                  ~ (' picked' if picked_away else '')
+                  ~ (' disabled' if away_disabled else '')
+              ) %}
+
+              {% if admin_preview %}
+                <div class="{{ chip_classes }}">
+                  {% if not has_spread %}<span class="opacity-50">—</span>
+                  {% else %}{% if is_pk %}PK{% else %}{{ g.spread_away|fmt_spread }}{% endif %}{% endif %}
+                </div>
+              {% else %}
                 <button
                   type="button"
-                  class="chip spread
-                         {{ ( 'win'  if result_away == 'W'
-                             else 'loss' if result_away == 'L'
-                             else 'push' if result_away == 'P'
-                             else 'pending') if picked_away else 'pending' }}
-                         {{ 'picked' if picked_away else '' }}
-                         {{ 'disabled' if away_disabled else '' }}
-                          cursor-pointer"
+                  class="{{ chip_classes }} cursor-pointer"
                   role="button"
                   aria-pressed="{{ 'true' if picked_away else 'false' }}"
                   aria-label="Select {{ g.away_team }} spread"
@@ -117,15 +137,14 @@
                   {% if away_disabled %} data-disabled="1" data-locked-chip="{{ 1 if locked else 0 }}"{% endif %}
                 >
                   {% if not has_spread %}<span class="opacity-50">—</span>
-                  {% else %}
-                    {% if is_pk %}PK{% else %}{{ g.spread_away|fmt_spread }}{% endif %}
-                  {% endif %}
+                  {% else %}{% if is_pk %}PK{% else %}{{ g.spread_away|fmt_spread }}{% endif %}{% endif %}
                 </button>
-              </div>
+              {% endif %}
+            </div>
 
               {# -------------------- HOME -------------------- #}
               {% set picked_home   = (chosen == g.home_team) %}
-              {% set home_disabled = (disable or not has_spread or locked) %}
+              {% set home_disabled = (disable or not has_spread or locked) and not admin_preview %}
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_home else 0 }}">
@@ -146,16 +165,25 @@
                   </div>
                 </div>
 
+                {% set chip_classes = (
+                  'chip spread '
+                  ~ ( 'win'  if result_home == 'W'
+                      else 'loss' if result_home == 'L'
+                      else 'push' if result_home == 'P'
+                      else 'pending')
+                  ~ (' picked' if picked_home else '')
+                  ~ (' disabled' if home_disabled else '')
+              ) %}
+
+              {% if admin_preview %}
+                <div class="{{ chip_classes }}">
+                  {% if not has_spread %}<span class="opacity-50">—</span>
+                  {% else %}{% if is_pk %}PK{% else %}{{ g.spread_home|fmt_spread }}{% endif %}{% endif %}
+                </div>
+              {% else %}
                 <button
                   type="button"
-                  class="chip spread
-                         {{ ( 'win'  if result_home == 'W'
-                             else 'loss' if result_home == 'L'
-                             else 'push' if result_home == 'P'
-                             else 'pending') if picked_home else 'pending' }}
-                         {{ 'picked' if picked_home else '' }}
-                         {{ 'disabled' if home_disabled else '' }}
-                          cursor-pointer"
+                  class="{{ chip_classes }} cursor-pointer"
                   role="button"
                   aria-pressed="{{ 'true' if picked_home else 'false' }}"
                   aria-label="Select {{ g.home_team }} spread"
@@ -165,11 +193,10 @@
                   {% if home_disabled %} data-disabled="1" data-locked-chip="{{ 1 if locked else 0 }}"{% endif %}
                 >
                   {% if not has_spread %}<span class="opacity-50">—</span>
-                  {% else %}
-                    {% if is_pk %}PK{% else %}{{ g.spread_home|fmt_spread }}{% endif %}
-                  {% endif %}
+                  {% else %}{% if is_pk %}PK{% else %}{{ g.spread_home|fmt_spread }}{% endif %}{% endif %}
                 </button>
-              </div>
+              {% endif %}
+            </div>
 
             </div>
           </article>

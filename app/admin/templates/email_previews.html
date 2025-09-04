@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Email Previews{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-[1100px] p-6 text-copy">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">Email Previews</h1>
+        <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+    </div>
+  
+  <form method="get" class="mb-6 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span class="text-copy-light">Week:</span>
+      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy"
+              onchange="this.form.submit()">
+        {% for w in range(1, 19) %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>Week {{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <a href="{{ url_for('admin.preview_weekly_spreads_email', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
+       target="_blank">
+      <div class="text-lg font-semibold mb-1">Weekly Spreads (HTML)</div>
+      <p class="text-sm text-copy-lighter">Open the email preview for spreads in a new tab.</p>
+    </a>
+
+    <a href="{{ url_for('admin.preview_weekly_spreads_email_txt', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
+       target="_blank">
+      <div class="text-lg font-semibold mb-1">Weekly Spreads (Text)</div>
+      <p class="text-sm text-copy-lighter">Plain text version of the spreads email.</p>
+    </a>
+
+    <a href="{{ url_for('admin.preview_weekly_standings_email', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
+       target="_blank">
+      <div class="text-lg font-semibold mb-1">Weekly Standings</div>
+      <p class="text-sm text-copy-lighter">Preview the standings email (template TBD).</p>
+    </a>
+  </div>
+</div>
+{% endblock %}

@@ -262,6 +262,315 @@ def picks_matrix():
 
 
 # ------------------------------------------------------------
+# Email previews page (links to previews)
+# ------------------------------------------------------------
+@bp.get("/email/previews")
+@login_required
+def email_previews():
+    week = request.args.get("week", type=int) or current_week_number()
+    # You already have context-building helpers for spreads (groups, etc.)
+    # For now, just render a page that links out to the previews.
+
+    return render_template(
+        "email_previews.html",
+        selected_week=week,
+    )
+
+@bp.get("/email/weekly-standings/preview", endpoint="preview_weekly_standings_email")
+@login_required
+def preview_weekly_standings_email():
+    """Temporary placeholder until the real standings email is built."""
+    week = request.args.get("week", type=int) or current_week_number()
+    # You can swap this to render a real template later.
+    return render_template(
+        "email/weekly_standings.html",
+        week_number=week,
+    )
+
+@bp.get("/email/weekly-spreads/preview")
+@login_required
+def preview_weekly_spreads_email():
+    week = request.args.get("week", type=int) or current_week_number()
+
+    games = (
+        db.session.query(Game)
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
+    groups = _group_games_for_email(games)
+
+    prev_week = max(1, week - 1)
+    standings_rows = _build_standings_rows_for_email(prev_week)
+
+    return render_template(
+        "email/weekly_spreads.html",
+        groups=groups,
+        all_locked=True,
+        now_utc=datetime.now(timezone.utc),
+        week_number=week,
+        week_date_range_text="",
+        weekly_lines_url=url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        timezone_name="MT",
+        current_year=datetime.now().year,
+        standings_rows=standings_rows,
+        prev_week_number=prev_week,
+    )
+
+@bp.get("/email/weekly-spreads/preview.txt")
+@login_required
+def preview_weekly_spreads_email_txt():
+    """Plain-text preview (multipart/alternative text part)."""
+    week = request.args.get("week", type=int) or current_week_number()
+    games = (
+        db.session.query(Game)
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
+    groups = _group_games_for_email(games)
+    context = {
+        "groups": groups,
+        "all_locked": True,
+        "now_utc": datetime.now(timezone.utc),
+        "ats_resolved": {},
+        "week_number": week,
+        "week_date_range_text": "",
+        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        "about_url": url_for("standings.standings", _external=True),
+        "timezone_name": "MT",
+        "current_year": datetime.now().year,
+    }
+    return render_template("email/weekly_spreads.txt", **context), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+def get_tzname() -> str:
+    tz = getattr(current_user, "timezone", None)
+    return tz or "MT"
+
+def _to_sort_tuple(x: Any) -> tuple[int, Any]:
+    """
+    Normalize various potential sort-key types (date/datetime/str/None/number)
+    into a single comparable tuple. Lower tuple compares first.
+    Priority order:
+      0: datetime-like
+      1: numeric
+      2: string
+      9: None / unknown
+    """
+    if isinstance(x, datetime):
+        # sort by actual datetime
+        return (0, x)
+    if isinstance(x, date):
+        # convert date to datetime at midnight for stable ordering
+        return (0, datetime(x.year, x.month, x.day, tzinfo=timezone.utc))
+    if isinstance(x, (int, float)):
+        return (1, x)
+    if isinstance(x, str):
+        return (2, x)
+    if x is None:
+        return (9, 0)
+    # fallback to string representation
+    return (2, str(x))
+
+def _min_sort(a: tuple[int, Any] | None, b: Any) -> tuple[int, Any]:
+    """Return the min (normalized) of existing tuple vs new raw value."""
+    nb = _to_sort_tuple(b)
+    if a is None:
+        return nb
+    return a if a <= nb else nb
+
+def _group_games_for_email(games, tzname: str = "America/Denver"):
+    """
+    Returns the same structure your weekly_lines partial uses:
+    groups = [(day_title, [(time_title, [games])])]
+    """
+    by_day = {}
+    day_order = {}
+
+    for g in games:
+        dlabel, dsort = day_key(g.kickoff_at, tzname)
+        if dlabel not in by_day:
+            by_day[dlabel] = []
+            day_order[dlabel] = dsort
+        by_day[dlabel].append(g)
+
+    groups = []
+    for dlabel in sorted(by_day.keys(), key=lambda d: day_order[d]):
+        day_games = sorted(by_day[dlabel], key=lambda gg: (gg.kickoff_at or datetime.max.replace(tzinfo=timezone.utc), gg.id))
+
+        by_time = {}
+        time_order = {}
+
+        for g in day_games:
+            tlabel, tsort = time_key(g.kickoff_at, tzname)
+            if tlabel not in by_time:
+                by_time[tlabel] = []
+                time_order[tlabel] = tsort
+            by_time[tlabel].append(g)
+
+        times = [(t, by_time[t]) for t in sorted(by_time.keys(), key=lambda t: time_order[t])]
+        groups.append((dlabel, times))
+
+    return groups
+
+def _build_standings_rows_for_email(prev_week: int):
+    """
+    Returns rows for the email standings partial:
+      {
+        "rank": int,
+        "name": str,                 # display name using First / First L.
+        "picks": [{"label": str, "result": "W|L|P|pending|empty"}],  # label = nickname
+        "week_w": int, "week_l": int, "week_p": int,
+        "total_w": int, "total_l": int, "total_p": int,
+        "points": float
+      }
+    """
+    from collections import Counter  # local import to avoid clutter at top
+
+    users = User.query.order_by(User.username.asc()).all()
+
+    # ---------- display-name logic (same idea as your standings route) ----------
+    def split_name(u: User) -> tuple[str, str | None]:
+        first = (getattr(u, "first_name", None) or "").strip()
+        last  = (getattr(u, "last_name",  None) or "").strip()
+        if not first:
+            first = (u.username or "").strip()
+        last_initial = last[0].upper() if last else None
+        return first, last_initial
+
+    first_keys: list[str] = []
+    name_parts: dict[int, tuple[str, str | None]] = {}
+
+    for u in users:
+        fn, li = split_name(u)
+        name_parts[u.id] = (fn, li)
+        first_keys.append(fn.casefold())
+
+    first_counts = Counter(first_keys)
+
+    def display_name_for(u: User) -> str:
+        fn, li = name_parts[u.id]
+        needs_initial = first_counts[fn.casefold()] > 1
+        if needs_initial and li:
+            return f"{fn} {li}."
+        return fn
+
+    # ---------- weekly picks for prev_week ----------
+    pairs_week = (
+        db.session.query(Pick, Game)
+        .join(Game, Pick.game_id == Game.id)
+        .filter(Game.week == prev_week)
+        .all()
+    )
+    by_user_week: Dict[int, List[Tuple[Pick, Game]]] = {}
+    for p, g in pairs_week:
+        by_user_week.setdefault(p.user_id, []).append((p, g))
+
+    game_ids_week = [g.id for _, g in pairs_week]
+    ats_rows_week = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids_week)).all() if game_ids_week else []
+    ats_by_game_week = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows_week}
+
+    # ---------- season totals through prev_week ----------
+    pairs_to_date = (
+        db.session.query(Pick, Game)
+        .join(Game, Pick.game_id == Game.id)
+        .filter(Game.week <= prev_week)
+        .all()
+    )
+    by_user_to_date: Dict[int, List[Tuple[Pick, Game]]] = {}
+    for p, g in pairs_to_date:
+        by_user_to_date.setdefault(p.user_id, []).append((p, g))
+
+    game_ids_to_date = [g.id for _, g in pairs_to_date]
+    ats_rows_to_date = (
+        TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids_to_date)).all()
+        if game_ids_to_date else []
+    )
+    ats_by_game_to_date = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows_to_date}
+
+    # ---------- helpers ----------
+    def is_final(g: Game) -> bool:
+        comp = getattr(g, "completed", None)
+        if comp is not None:
+            return bool(comp)
+        return (g.final_score_home is not None and g.final_score_away is not None)
+
+    def grade(p: Pick, g: Game, pref_ats: dict | None) -> str:
+        # 'W'|'L'|'P'|'pending' — prefer ATS if present
+        if pref_ats is not None:
+            ats = pref_ats.get((g.id, p.chosen_team))
+            if ats == "COVER":    return "W"
+            if ats == "NO_COVER": return "L"
+            if ats == "PUSH":     return "P"
+        if not is_final(g):
+            return "pending"
+        pts = points_for_pick(p, g)
+        if pts == 1.0:  return "W"
+        if pts == 0.5:  return "P"
+        if pts == 0.0:  return "L"
+        return "pending"
+
+    rows = []
+    for u in users:
+        display_name = display_name_for(u)
+
+        weekly_w = weekly_l = weekly_p = 0
+        picks_disp = []
+        weekly_pairs = sorted(
+            by_user_week.get(u.id, []),
+            key=lambda pg: (pg[1].kickoff_at or datetime.max.replace(tzinfo=timezone.utc)),
+        )
+
+        for p, g in weekly_pairs[:5]:
+            res = grade(p, g, ats_by_game_week)
+            if res == "W": weekly_w += 1
+            elif res == "L": weekly_l += 1
+            elif res == "P": weekly_p += 1
+            # nickname only (e.g., "Chargers", not "Los Angeles Chargers")
+            nick = team_short(p.chosen_team) or p.chosen_team or ""
+            picks_disp.append({"label": nick, "result": res})
+
+        while len(picks_disp) < 5:
+            picks_disp.append({"label": "", "result": "empty"})
+
+        tot_w = tot_l = tot_p = 0
+        points = 0.0
+        for p, g in by_user_to_date.get(u.id, []):
+            if not is_final(g):
+                continue
+            ats = ats_by_game_to_date.get((g.id, p.chosen_team))
+            if ats == "COVER":
+                pts = 1.0
+            elif ats == "PUSH":
+                pts = 0.5
+            elif ats == "NO_COVER":
+                pts = 0.0
+            else:
+                pts = points_for_pick(p, g)
+            if pts is None:
+                continue
+            points += float(pts)
+            if pts == 1.0:   tot_w += 1
+            elif pts == 0.5: tot_p += 1
+            elif pts == 0.0: tot_l += 1
+
+        rows.append({
+            "rank": 0,  # set after sort
+            "name": display_name,         # ✅ display-name logic applied
+            "picks": picks_disp,          # ✅ nickname labels
+            "week_w": weekly_w, "week_l": weekly_l, "week_p": weekly_p,
+            "total_w": tot_w, "total_l": tot_l, "total_p": tot_p,
+            "points": points,
+        })
+
+    # Same sort as your standings page
+    rows.sort(key=lambda r: (-r["points"], -r["total_w"], r["total_l"], -r["total_p"], r["name"].lower()))
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+    return rows
+
+
+# ------------------------------------------------------------
 # Admin-only lines fragment (read-only)
 # ------------------------------------------------------------
 @bp.get("/lines/fragment")
@@ -328,6 +637,8 @@ def admin_lines_fragment():
             ats_resolved=ats_resolved,          # ✅ what the partial expects
             tzname=tzname,
             abbr_team=abbr_team,
+            all_locked=False,       # admin view should not require lock
+            admin_preview=True,     # ✅ lets spreads show up
         )
         current_app.logger.info("[admin_lines_fragment] render OK")
         return html
@@ -553,128 +864,3 @@ def db_update_cell(model_name, row_id):
     db.session.add(obj)
     db.session.commit()
     return jsonify({"ok": True})
-
-def get_tzname() -> str:
-    tz = getattr(current_user, "timezone", None)
-    return tz or "MT"
-
-def _to_sort_tuple(x: Any) -> tuple[int, Any]:
-    """
-    Normalize various potential sort-key types (date/datetime/str/None/number)
-    into a single comparable tuple. Lower tuple compares first.
-    Priority order:
-      0: datetime-like
-      1: numeric
-      2: string
-      9: None / unknown
-    """
-    if isinstance(x, datetime):
-        # sort by actual datetime
-        return (0, x)
-    if isinstance(x, date):
-        # convert date to datetime at midnight for stable ordering
-        return (0, datetime(x.year, x.month, x.day, tzinfo=timezone.utc))
-    if isinstance(x, (int, float)):
-        return (1, x)
-    if isinstance(x, str):
-        return (2, x)
-    if x is None:
-        return (9, 0)
-    # fallback to string representation
-    return (2, str(x))
-
-def _min_sort(a: tuple[int, Any] | None, b: Any) -> tuple[int, Any]:
-    """Return the min (normalized) of existing tuple vs new raw value."""
-    nb = _to_sort_tuple(b)
-    if a is None:
-        return nb
-    return a if a <= nb else nb
-
-def _group_games_for_email(games, tzname: str = "America/Denver"):
-    """
-    Returns the same structure your weekly_lines partial uses:
-    groups = [(day_title, [(time_title, [games])])]
-    """
-    by_day = {}
-    day_order = {}
-
-    for g in games:
-        dlabel, dsort = day_key(g.kickoff_at, tzname)
-        if dlabel not in by_day:
-            by_day[dlabel] = []
-            day_order[dlabel] = dsort
-        by_day[dlabel].append(g)
-
-    groups = []
-    for dlabel in sorted(by_day.keys(), key=lambda d: day_order[d]):
-        day_games = sorted(by_day[dlabel], key=lambda gg: (gg.kickoff_at or datetime.max.replace(tzinfo=timezone.utc), gg.id))
-
-        by_time = {}
-        time_order = {}
-
-        for g in day_games:
-            tlabel, tsort = time_key(g.kickoff_at, tzname)
-            if tlabel not in by_time:
-                by_time[tlabel] = []
-                time_order[tlabel] = tsort
-            by_time[tlabel].append(g)
-
-        times = [(t, by_time[t]) for t in sorted(by_time.keys(), key=lambda t: time_order[t])]
-        groups.append((dlabel, times))
-
-    return groups
-
-@bp.get("/email/weekly-spreads/preview")
-@login_required
-def preview_weekly_spreads_email():
-    """HTML preview in the browser (email-safe markup)."""
-    week = request.args.get("week", type=int) or current_week_number()
-    # Pull games for the week
-    games = (
-        db.session.query(Game)
-        .filter(Game.week == week)
-        .order_by(Game.kickoff_at.asc(), Game.id.asc())
-        .all()
-    )
-
-    groups = _group_games_for_email(games)
-
-    # Email context (match your template variables)
-    context = {
-        "groups": groups,
-        "all_locked": True,  # set True so spreads show; flip to your real flag if you want
-        "now_utc": datetime.now(timezone.utc),
-        "week_number": week,
-        "week_date_range_text": "",  # optional pretty range text if you have it
-        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
-        "timezone_name": "MT",  # if you track user TZ, swap it in
-        "current_year": datetime.now().year,
-    }
-
-    return render_template("email/weekly_spreads.html", **context)
-
-@bp.get("/email/weekly-spreads/preview.txt")
-@login_required
-def preview_weekly_spreads_text():
-    """Plain-text preview (multipart/alternative text part)."""
-    week = request.args.get("week", type=int) or current_week_number()
-    games = (
-        db.session.query(Game)
-        .filter(Game.week == week)
-        .order_by(Game.kickoff_at.asc(), Game.id.asc())
-        .all()
-    )
-    groups = _group_games_for_email(games)
-    context = {
-        "groups": groups,
-        "all_locked": True,
-        "now_utc": datetime.now(timezone.utc),
-        "ats_resolved": {},
-        "week_number": week,
-        "week_date_range_text": "",
-        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
-        "about_url": url_for("standings.standings", _external=True),
-        "timezone_name": "MT",
-        "current_year": datetime.now().year,
-    }
-    return render_template("email/weekly_spreads.txt", **context), 200, {"Content-Type": "text/plain; charset=utf-8"}

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 from app.models import Game  # OK to import models here
+from app.services.time_utils import to_local, round5
+
 
 TEAM_ABBR = {
     # NFC
@@ -146,6 +148,23 @@ def chip_tw(result: Optional[str]) -> str:
     }
     return palette.get(chip_class(result), palette["pending"])
 
+def fmt_local(dt_utc, tzname="UTC", kind="time"):
+    if not dt_utc:
+        return ""
+    local = to_local(dt_utc, tzname)
+    if kind == "time":
+        local = round5(local)
+        h = local.strftime('%I').lstrip('0') or '0'
+        m = local.strftime('%M')
+        ap = local.strftime('%p')
+        abbr = local.strftime('%Z')
+        return f"{h}:{m} {ap} {abbr}"
+    # kind == "date"  ->  Thursday (9/4)
+    dow = local.strftime("%A")
+    mm  = local.strftime("%m").lstrip("0") or "0"
+    dd  = local.strftime("%d").lstrip("0") or "0"
+    return f"{dow} ({mm}/{dd})"
+
 # ---- Globals ----
 def is_pickem(game: Game) -> bool:
     """True when both sides are effectively 0."""
@@ -160,6 +179,7 @@ def register_template_utils(app):
     app.add_template_filter(team_short, "team_short")
     app.add_template_filter(abbr_team,  "abbr_team")
     app.add_template_filter(fmt_spread, "fmt_spread")
+    app.add_template_filter(fmt_local, "fmt_local")
     app.add_template_filter(chip_class, "chip_class")
     app.add_template_filter(chip_tw,    "chip_tw")  
     app.add_template_filter(team_city,  "team_city")     
