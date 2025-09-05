@@ -5,8 +5,9 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, date
 from collections import defaultdict, OrderedDict
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from urllib.parse import urlencode
+from sqlalchemy import func
 from sqlalchemy.sql import sqltypes as T
 
 from app.extensions import db
@@ -267,24 +268,26 @@ def picks_matrix():
 @bp.get("/email/previews")
 @login_required
 def email_previews():
-    week = request.args.get("week", type=int) or current_week_number()
-    # You already have context-building helpers for spreads (groups, etc.)
-    # For now, just render a page that links out to the previews.
+    row = db.session.query(func.min(Game.week), func.max(Game.week)).first()
+
+    min_raw = row[0] if row else None
+    max_raw = row[1] if row else None
+
+    min_week = int(min_raw) if min_raw is not None else 1
+    max_week = int(max_raw) if max_raw is not None else min_week
+
+    weeks = list(range(min_week, max_week + 1))
+
+    sel = request.args.get("week", type=int) or current_week_number()
+    if sel < min_week: sel = min_week
+    if sel > max_week: sel = max_week
 
     return render_template(
         "email_previews.html",
-        selected_week=week,
-    )
-
-@bp.get("/email/weekly-standings/preview", endpoint="preview_weekly_standings_email")
-@login_required
-def preview_weekly_standings_email():
-    """Temporary placeholder until the real standings email is built."""
-    week = request.args.get("week", type=int) or current_week_number()
-    # You can swap this to render a real template later.
-    return render_template(
-        "email/weekly_standings.html",
-        week_number=week,
+        weeks=weeks,
+        selected_week=sel,
+        min_week=min_week,
+        max_week=max_week,
     )
 
 @bp.get("/email/weekly-spreads/preview")

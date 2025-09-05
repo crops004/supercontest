@@ -1,16 +1,40 @@
+{# ===================== Weekly Spreads — Plain Text ===================== #}
+{# Context expected:
+   - week_number
+   - groups: [(day_title, [(time_title, [games])])]
+   - timezone_name
+   - weekly_lines_url
+   - about_url (optional)
+   - all_locked (bool): whether to show spreads
+   - now_utc (datetime)
+   - fmt_spread filter available
+#}
+
 Week {{ week_number }} Spreads
-{{ week_date_range_text }}
 
-{% for day_title, times in groups -%}
+{%- if groups|length == 0 %}
+No games for this week.
+{%- else %}
+{%- for day_title, times in groups %}
+
 {{ day_title }}
-{%- for time_title, items in times %}
-  {%- for g in items %}
-- {{ time_title }} — {{ g.away_team }} at {{ g.home_team }}{% if g.kickoff_at and now_utc and g.kickoff_at <= now_utc %} [Locked]{% endif %}{% if g.spread_home is not none and g.spread_away is not none and all_locked %}{% if g.spread_home == 0 and g.spread_away == 0 %} | PK{% else %} | Away {{ g.spread_away|fmt_spread }}, Home {{ g.spread_home|fmt_spread }}{% endif %}{% endif %}
+{{ "-" * (day_title|length) }}
+  {%- for time_title, items in times %}
+  {{ time_title }}
+    {%- for g in items %}
+    {%- set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+    {%- set has_spread_actual = (g.spread_home is not none and g.spread_away is not none) %}
+    {%- set is_pk = (has_spread_actual and g.spread_home == 0 and g.spread_away == 0) %}
+    {%- set show_spreads = (all_locked and has_spread_actual) %}
+
+    - {{ g.away_team }}{% if show_spreads %}    {{ "PK" if is_pk else (g.spread_away | fmt_spread) }}{% endif %}
+    - {{ g.home_team }}{% if show_spreads %}    {{ "PK" if is_pk else (g.spread_home | fmt_spread) }}{% endif %}{% if locked %}    [Locked]{% endif %}
+
+    {%- endfor %}
   {%- endfor %}
-{%- endfor %}
 
 {%- endfor %}
+{%- endif %}
 
 Make your picks: {{ weekly_lines_url }}
-How it works: {{ about_url }}
 Times shown in {{ timezone_name }}.

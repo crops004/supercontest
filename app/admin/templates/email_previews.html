@@ -3,44 +3,155 @@
 
 {% block content %}
 <div class="mx-auto max-w-[1100px] p-6 text-copy">
-    <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Email Previews</h1>
-        <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  <h1 class="text-2xl font-bold mb-6">Email Previews</h1>
+
+  <!-- Controls -->
+  <div class="flex flex-col gap-3 mb-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-2">
+        <button id="wk-prev"
+                class="rounded-lg border border-border bg-foreground px-3 py-2 hover:ring-2 hover:ring-primary/40"
+                title="Previous week"
+                aria-label="Previous week">
+          &larr;
+        </button>
+
+        <label class="flex items-center gap-2">
+          <span class="text-copy-light">Week:</span>
+          <select id="preview-week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
+            {% for w in weeks %}
+              <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <button id="wk-next"
+                class="rounded-lg border border-border bg-foreground px-3 py-2 hover:ring-2 hover:ring-primary/40"
+                title="Next week"
+                aria-label="Next week">
+          &rarr;
+        </button>
+      </div>
+
+      <div class="flex gap-2 flex-wrap ml-auto">
+        <button
+          class="rounded-lg border border-border bg-foreground px-4 py-2 hover:ring-2 hover:ring-primary/40"
+          data-type="html"
+          data-base="{{ url_for('admin.preview_weekly_spreads_email') }}"
+        >
+          Weekly Spreads (HTML)
+        </button>
+
+        <button
+          class="rounded-lg border border-border bg-foreground px-4 py-2 hover:ring-2 hover:ring-primary/40"
+          data-type="text"
+          data-base="{{ url_for('admin.preview_weekly_spreads_email_txt') }}"
+        >
+          Weekly Spreads (Text)
+        </button>
+      </div>
     </div>
-  
-  <form method="get" class="mb-6 flex items-center gap-2">
-    <label class="flex items-center gap-2">
-      <span class="text-copy-light">Week:</span>
-      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy"
-              onchange="this.form.submit()">
-        {% for w in range(1, 19) %}
-          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>Week {{ w }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </form>
+  </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    <a href="{{ url_for('admin.preview_weekly_spreads_email', week=selected_week) }}"
-       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
-       target="_blank">
-      <div class="text-lg font-semibold mb-1">Weekly Spreads (HTML)</div>
-      <p class="text-sm text-copy-lighter">Open the email preview for spreads in a new tab.</p>
-    </a>
-
-    <a href="{{ url_for('admin.preview_weekly_spreads_email_txt', week=selected_week) }}"
-       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
-       target="_blank">
-      <div class="text-lg font-semibold mb-1">Weekly Spreads (Text)</div>
-      <p class="text-sm text-copy-lighter">Plain text version of the spreads email.</p>
-    </a>
-
-    <a href="{{ url_for('admin.preview_weekly_standings_email', week=selected_week) }}"
-       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40"
-       target="_blank">
-      <div class="text-lg font-semibold mb-1">Weekly Standings</div>
-      <p class="text-sm text-copy-lighter">Preview the standings email (template TBD).</p>
-    </a>
+  <!-- Inline preview target -->
+  <div id="preview-container" class="rounded-xl border border-border bg-foreground p-4 min-h-[120px]">
+    <p class="text-copy-light">Select a preview above to load it here.</p>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(() => {
+  const weekSel = document.getElementById('preview-week');
+  const btnPrev  = document.getElementById('wk-prev');
+  const btnNext  = document.getElementById('wk-next');
+  const container = document.getElementById('preview-container');
+
+  // Store last preview so changing week re-loads the same kind
+  let last = { type: null, base: null };
+
+  // Bounds from server (we can infer from the select options)
+  const options = Array.from(weekSel.options).map(o => parseInt(o.value, 10));
+  const minWeek = Math.min(...options);
+  const maxWeek = Math.max(...options);
+
+  function clampWeek(n) {
+    return Math.max(minWeek, Math.min(maxWeek, n));
+  }
+
+  function updateArrows() {
+    const w = parseInt(weekSel.value, 10);
+    btnPrev.disabled = (w <= minWeek);
+    btnNext.disabled = (w >= maxWeek);
+    btnPrev.classList.toggle('opacity-50', btnPrev.disabled);
+    btnNext.classList.toggle('opacity-50', btnNext.disabled);
+  }
+
+  function buildUrl(base, week) {
+    const u = new URL(base, window.location.origin);
+    u.searchParams.set('week', String(week));
+    return u.toString();
+  }
+
+  async function loadPreview(base, type) {
+    const week = weekSel?.value || '';
+    const url = buildUrl(base, week);
+    last = { type, base };
+
+    container.innerHTML = '<p class="text-copy-light">Loading…</p>';
+    try {
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+      const body = await res.text();
+      if (!res.ok) throw new Error(body);
+
+      if (type === 'text') {
+        container.innerHTML = `<pre class="whitespace-pre-wrap text-sm text-copy">${body.replace(/</g, '&lt;')}</pre>`;
+      } else {
+        container.innerHTML = body; // HTML preview content
+      }
+    } catch (err) {
+      console.error('[email preview] failed:', err);
+      container.innerHTML = `<p class="text-error">Failed to load preview.</p>`;
+    }
+  }
+
+  // Hook up the two preview buttons
+  document.querySelectorAll('button[data-base]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      loadPreview(btn.dataset.base, btn.dataset.type);
+    });
+  });
+
+  // Week dropdown change -> reload the last preview if any
+  weekSel.addEventListener('change', () => {
+    updateArrows();
+    if (last.base && last.type) loadPreview(last.base, last.type);
+  });
+
+  // Prev/Next buttons -> change week by ±1 and reload preview
+  btnPrev.addEventListener('click', () => {
+    const w = clampWeek(parseInt(weekSel.value, 10) - 1);
+    if (w !== parseInt(weekSel.value, 10)) {
+      weekSel.value = String(w);
+      weekSel.dispatchEvent(new Event('change'));
+    }
+  });
+  btnNext.addEventListener('click', () => {
+    const w = clampWeek(parseInt(weekSel.value, 10) + 1);
+    if (w !== parseInt(weekSel.value, 10)) {
+      weekSel.value = String(w);
+      weekSel.dispatchEvent(new Event('change'));
+    }
+  });
+
+  // Initial state
+  updateArrows();
+
+  // Optional: auto-load HTML preview initially
+  const firstBtn = document.querySelector('button[data-base][data-type="html"]');
+  if (firstBtn) loadPreview(firstBtn.dataset.base, firstBtn.dataset.type);
+})();
+</script>
 {% endblock %}

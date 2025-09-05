@@ -97,6 +97,7 @@
   /* LIGHT surface + text */
   --color-background: hsl(260 10% 94%);
   --color-foreground: hsl(240 14% 99%);
+  --color-extra-foreground: hsl(220 16% 99%);
   --color-border: hsl(260 9% 87%);
 
   --color-copy: hsl(263 11% 15%);
@@ -118,6 +119,7 @@
   /* only the six that change */
   --color-background: hsl(264 10% 10%);
   --color-foreground: hsl(263 11% 15%);
+  --color-extra-foreground: hsl(263 12% 20%);
   --color-border: hsl(263 10% 25%);
 
   --color-copy: hsl(240 14% 99%);
