@@ -440,7 +440,7 @@ def send_weekly_spreads_bulk():
 def _send_weekly_to_subscribers(week: int) -> tuple[int, int, list[str]]:
     """Factor the core logic out of your POST admin route so we can reuse it here."""
     ctx = build_weekly_spreads_context(week, locked=True)
-    subject = f"Week {ctx['week_number']} NFL Spreads"
+    subject = f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads"
     html_body = render_template("email/weekly_spreads.html", **ctx)
     try:
         text_body = render_template("email/weekly_spreads.txt", **ctx)
@@ -463,18 +463,27 @@ def _send_weekly_to_subscribers(week: int) -> tuple[int, int, list[str]]:
 
 @bp.post("/internal/cron/weekly-email")
 def cron_weekly_email():
-    # Simple shared-secret auth (no login)
+    # Auth
     token = request.args.get("token") or request.headers.get("X-CRON-TOKEN")
-    if not token or token != current_app.config.get("CRON_SECRET"):
+    secret = current_app.config.get("CRON_SECRET")
+    if not token or token != secret:
         abort(401)
 
     week = request.args.get("week", type=int) or current_week_number()
 
-    # DST-safe guard: only run at **local** Tue 12:00 (America/Denver)
+    # Robust force parsing: accepts 1/true/yes/on (any case)
+    raw_force = request.args.get("force", "")
+    force = str(raw_force).strip().lower() in ("1", "true", "yes", "y", "on")
+
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    if now_local.weekday() != 1 or now_local.hour != 12:
-        # Not the target local time → exit quietly so you can schedule multiple UTC times safely
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
+    current_app.logger.info(
+        "[cron_weekly_email] week=%s force=%s now_local=%s",
+        week, force, now_local.isoformat()
+    )
+
+    if not force:
+        if now_local.weekday() != 1 or now_local.hour != 12:
+            return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
 
     sent, total, failed = _send_weekly_to_subscribers(week)
     return jsonify({"ok": True, "week": week, "total": total, "sent": sent, "failed": failed}), 200
