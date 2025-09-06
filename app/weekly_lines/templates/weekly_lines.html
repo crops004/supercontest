@@ -124,22 +124,21 @@ const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedT
 let dirty = false;
 function storageKey(week) { return `pendingPicks:${week}`; }
 
+/* ---------- Expose selected week globally for /api/picks/status ---------- */
+window.selectedWeek = window.selectedWeek || parseInt(weekControls?.dataset?.selectedWeek || weekEl?.value || '0', 10) || 0;
+
 /* ========================================================================== *
  * Utilities
  * ========================================================================== */
 
-/** Robustly get current week (no Jinja in JS). */
 function currentWeek() {
   const v1 = parseInt((weekEl && weekEl.value) || "", 10);
   if (Number.isFinite(v1)) return v1;
-
   const v2 = parseInt((hiddenWeek && hiddenWeek.value) || "", 10);
   if (Number.isFinite(v2)) return v2;
-
   const ds = document.getElementById("week-controls")?.dataset;
   const v3 = parseInt((ds && ds.selectedWeek) || "", 10);
   if (Number.isFinite(v3)) return v3;
-
   return 0;
 }
 
@@ -371,6 +370,12 @@ async function loadWeek(w) {
     restoreSelectionsFromCache();
     syncFallbackHiddenInputs();
     setDirty(false);
+
+    // 🔁 Keep the banner in sync with the currently viewed week
+    window.selectedWeek = parseInt(w, 10) || 0;
+    if (typeof window.refreshPicksBanner === 'function') {
+      await window.refreshPicksBanner();
+    }
   } catch (e) {
     console.error(e);
     statusEl.textContent = 'Failed to load week ' + w;
@@ -461,7 +466,8 @@ floatBtn?.addEventListener('click', async () => {
     floatBtn.disabled = false;
     clearCacheForWeek(wk);
 
-    // ✅ Update the picks banner instantly
+    // ✅ Tell the banner logic picks changed, and also refresh directly
+    document.dispatchEvent(new CustomEvent("picks:changed"));
     if (typeof window.refreshPicksBanner === 'function') {
       await window.refreshPicksBanner();
     }
@@ -469,7 +475,6 @@ floatBtn?.addEventListener('click', async () => {
     // Reload the games list (locked states, etc.)
     await loadWeek(wk);
 
-    // Recalc sticky layout just in case heights changed
     if (typeof window.recalcStickyLayout === 'function') {
       window.recalcStickyLayout();
     }
@@ -500,6 +505,14 @@ function initAfterRender() {
   const initialFlag = document.getElementById('initial-lock-flag');
   const allLocked = initialFlag ? (initialFlag.dataset.allLocked === '1') : true;
   setLockBanner(allLocked);
+
+  // Expose current week to the global so /api/picks/status can use it
+  window.selectedWeek = currentWeek();
+
+  // 🔁 Make sure the picks banner reflects this first view (no-reload landing)
+  if (typeof window.refreshPicksBanner === 'function') {
+    window.refreshPicksBanner();
+  }
 
   restoreSelectionsFromCache();
   syncFallbackHiddenInputs();

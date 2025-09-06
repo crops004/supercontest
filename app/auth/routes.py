@@ -1,8 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, current_user, login_required
+from urllib.parse import urlparse, urljoin
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+
+import hashlib
+
 from app.extensions import db
 from app.models import User
-from urllib.parse import urlparse, urljoin
+from app.emailer import send_email
 from . import bp
 
 @bp.route('/register', methods=['GET', 'POST'])
@@ -44,12 +49,109 @@ def register():
 
     return render_template('auth_register.html')
 
+def _reset_serializer() -> URLSafeTimedSerializer:
+    # Uses your SECRET_KEY; unique salt for this purpose
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="pw-reset")
+
+def _ver_from_user(u: User) -> str:
+    # Derives a short version string from password_hash so tokens
+    # auto-invalidate after password changes.
+    raw = (u.password_hash or "").encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:12]
+
+def make_reset_token(u: User) -> str:
+    s = _reset_serializer()
+    return s.dumps({"id": u.id, "v": _ver_from_user(u)})
+
+def load_user_from_token(token: str, max_age: int = 3600 * 2) -> User | None:
+    """Return user if token is valid & unexpired; otherwise None."""
+    s = _reset_serializer()
+    try:
+        data = s.loads(token, max_age=max_age)  # seconds
+    except (BadSignature, SignatureExpired):
+        return None
+    u = User.query.get(data.get("id"))
+    if not u:
+        return None
+    if data.get("v") != _ver_from_user(u):
+        return None
+    return u
 
 def _is_safe_next_url(target: str) -> bool:
     """Prevent open-redirects: only allow same-host absolute URLs."""
     ref = urlparse(request.host_url)
     test = urlparse(urljoin(request.host_url, target))
     return (test.scheme in ("http", "https")) and (ref.netloc == test.netloc)
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("standings.standings"))
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip()
+        # Always show the same success message to avoid account enumeration
+        success_msg = "If that email is in our system, you’ll receive a reset link shortly."
+
+        if not email:
+            flash(success_msg, "auth_success")
+            return redirect(url_for("auth.forgot_password"))
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            flash(success_msg, "auth_success")
+            return redirect(url_for("auth.forgot_password"))
+
+        # Build reset link
+        token = make_reset_token(user)
+        reset_url = url_for("auth.reset_password", token=token, _external=True)
+
+        # Render email bodies
+        html = render_template("email/reset_password.html", reset_url=reset_url, user=user)
+        text = render_template("email/reset_password.txt", reset_url=reset_url, user=user)
+
+        # Send
+        send_email(subject="Reset your password", recipients=email, html=html, text=text)
+
+        flash(success_msg, "auth_success")
+        return redirect(url_for("auth.login"))
+
+    return render_template("auth_forgot.html")
+
+
+@bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for("standings.standings"))
+
+    user = load_user_from_token(token)
+    if not user:
+        flash("That reset link is invalid or has expired. Please request a new one.", "auth_error")
+        return redirect(url_for("auth.forgot_password"))
+
+    if request.method == "POST":
+        new = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        errors = []
+        if not new:
+            errors.append("Please enter a new password.")
+        if new != confirm:
+            errors.append("New password and confirmation do not match.")
+
+        if errors:
+            for e in errors:
+                flash(e, "auth_error")
+            return render_template("auth_reset.html")
+
+        # Save and sign them in (optional)
+        user.set_password(new)
+        db.session.commit()
+
+        flash("Your password has been updated. Please sign in.", "auth_success")
+        return redirect(url_for("auth.login"))
+
+    return render_template("auth_reset.html")
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():

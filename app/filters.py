@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional
 from app.models import Game  # OK to import models here
 from app.services.time_utils import to_local, round5
+from datetime import timezone
 
 
 TEAM_ABBR = {
@@ -173,6 +174,19 @@ def is_pickem(game: Game) -> bool:
         return False
     return abs(float(sh)) < 1e-9 and abs(float(sa)) < 1e-9
 
+def to_utc_ts(dt):
+    """
+    Convert a datetime (naive or tz-aware) to a UTC epoch timestamp (float).
+    Returns None if dt is falsy.
+    """
+    if not dt:
+        return None
+    if getattr(dt, "tzinfo", None) is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.timestamp()
+
 # ---- Registration hook ----
 def register_template_utils(app):
     # Filters
@@ -182,6 +196,7 @@ def register_template_utils(app):
     app.add_template_filter(fmt_local, "fmt_local")
     app.add_template_filter(chip_class, "chip_class")
     app.add_template_filter(chip_tw,    "chip_tw")  
-    app.add_template_filter(team_city,  "team_city")     
+    app.add_template_filter(team_city,  "team_city")
+    app.add_template_filter(to_utc_ts,  "to_utc_ts")     
     # Globals
     app.add_template_global(is_pickem,  "is_pickem")

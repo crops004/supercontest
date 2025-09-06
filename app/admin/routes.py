@@ -9,12 +9,15 @@ from typing import List, Dict, Tuple, Any, Optional
 from urllib.parse import urlencode
 from sqlalchemy import func
 from sqlalchemy.sql import sqltypes as T
+from time import sleep
+from zoneinfo import ZoneInfo
 
 from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS
 from app.scoring import points_for_pick
 from app.services.time_utils import day_key, time_key
 from app.filters import abbr_team, team_short  # chips
+from app.emailer import send_email
 
 # Services
 from app.services.games_sync import (
@@ -63,7 +66,16 @@ def actions():
         selected_week = current_wk if current_wk in weeks else (weeks[-1] if weeks else 0)
     elif selected_week not in weeks and weeks:
         selected_week = weeks[-1]
-    return render_template("actions.html", weeks=weeks, selected_week=selected_week)
+
+    # NEW: count recipients
+    recap_count = (
+        db.session.query(User)
+        .filter(User.notify_weekly_recap.is_(True))
+        .filter(User.email.isnot(None))
+        .count()
+    )
+
+    return render_template("actions.html", weeks=weeks, selected_week=selected_week, recap_count=recap_count)
 
 
 # actions (POST) stay the same, just redirect to admin.actions
@@ -265,6 +277,40 @@ def picks_matrix():
 # ------------------------------------------------------------
 # Email previews page (links to previews)
 # ------------------------------------------------------------
+
+# Build the exact context the weekly_spreads templates already use.
+def build_weekly_spreads_context(week: int,
+                                 *,
+                                 locked: bool | None = None,
+                                 weekly_lines_url: str | None = None) -> dict:
+    games = (
+        db.session.query(Game)
+        .filter(Game.week == week)
+        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+        .all()
+    )
+    groups = _group_games_for_email(games)
+
+    prev_week = max(1, week - 1)
+    standings_rows = _build_standings_rows_for_email(prev_week)
+
+    ctx = {
+        "groups": groups,
+        # your preview hard-coded True; allow override via `locked`
+        "all_locked": True if locked is None else bool(locked),
+        "now_utc": datetime.now(timezone.utc),
+        "week_number": week,
+        "week_date_range_text": "",
+        "weekly_lines_url": weekly_lines_url or url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        "timezone_name": "MT",
+        "current_year": datetime.now().year,
+        "standings_rows": standings_rows,
+        "prev_week_number": prev_week,
+        "timezone_name": "MDT",              # display label only (what you want to print)
+        "tzname": "America/Denver",          # IANA tz for fmt_local()
+    }
+    return ctx
+
 @bp.get("/email/previews")
 @login_required
 def email_previews():
@@ -294,57 +340,144 @@ def email_previews():
 @login_required
 def preview_weekly_spreads_email():
     week = request.args.get("week", type=int) or current_week_number()
-
-    games = (
-        db.session.query(Game)
-        .filter(Game.week == week)
-        .order_by(Game.kickoff_at.asc(), Game.id.asc())
-        .all()
-    )
-    groups = _group_games_for_email(games)
-
-    prev_week = max(1, week - 1)
-    standings_rows = _build_standings_rows_for_email(prev_week)
-
-    return render_template(
-        "email/weekly_spreads.html",
-        groups=groups,
-        all_locked=True,
-        now_utc=datetime.now(timezone.utc),
-        week_number=week,
-        week_date_range_text="",
-        weekly_lines_url=url_for("weekly_lines.weekly_lines", week=week, _external=True),
-        timezone_name="MT",
-        current_year=datetime.now().year,
-        standings_rows=standings_rows,
-        prev_week_number=prev_week,
-    )
+    ctx = build_weekly_spreads_context(week, locked=True)
+    return render_template("email/weekly_spreads.html", **ctx)
 
 @bp.get("/email/weekly-spreads/preview.txt")
 @login_required
 def preview_weekly_spreads_email_txt():
-    """Plain-text preview (multipart/alternative text part)."""
     week = request.args.get("week", type=int) or current_week_number()
-    games = (
-        db.session.query(Game)
-        .filter(Game.week == week)
-        .order_by(Game.kickoff_at.asc(), Game.id.asc())
+    ctx = build_weekly_spreads_context(week, locked=True)
+    return render_template("email/weekly_spreads.txt", **ctx), 200, {
+        "Content-Type": "text/plain; charset=utf-8"
+    }
+
+@bp.get("/email/weekly-spreads/send")
+@login_required
+def send_weekly_spreads_email():
+    """
+    Use:
+      /admin/email/weekly-spreads/send?week=1&to=you@gmail.com
+      (optional) &locked=1 to force spreads in dev
+    """
+    to = request.args.get("to")
+    if not to:
+        return "Add ?to=you@example.com", 400
+
+    week = request.args.get("week", type=int) or current_week_number()
+    locked = request.args.get("locked")
+    locked_flag = (locked == "1") if locked is not None else None
+
+    ctx = build_weekly_spreads_context(week, locked=locked_flag)
+
+    html_body = render_template("email/weekly_spreads.html", **ctx)
+    try:
+        text_body = render_template("email/weekly_spreads.txt", **ctx)
+    except Exception:
+        text_body = None
+
+    ok = send_email(
+        subject=f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads",
+        recipients=to,
+        html=html_body,
+        text=text_body,
+    )
+    return ("✅ sent", 200) if ok else ("❌ failed", 500)
+
+@bp.post("/email/weekly-spreads/send-all")
+@login_required
+def send_weekly_spreads_bulk():
+    """
+    Sends the Week N email to all users who have notify_weekly_recap = True.
+    Uses the same HTML/TXT templates and context as the preview.
+    """
+    week = request.args.get("week", type=int) or current_week_number()
+
+    # Collect recipients
+    subs = (
+        User.query
+        .filter(User.notify_weekly_recap.is_(True))
+        .filter(User.email.isnot(None))
         .all()
     )
-    groups = _group_games_for_email(games)
-    context = {
-        "groups": groups,
-        "all_locked": True,
-        "now_utc": datetime.now(timezone.utc),
-        "ats_resolved": {},
-        "week_number": week,
-        "week_date_range_text": "",
-        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
-        "about_url": url_for("standings.standings", _external=True),
-        "timezone_name": "MT",
-        "current_year": datetime.now().year,
-    }
-    return render_template("email/weekly_spreads.txt", **context), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    total = len(subs)
+    if not total:
+        flash("No subscribers with notify_weekly_recap enabled.", "warning")
+        return redirect(url_for("admin.actions", week=week))
+
+    # Build the email once; reuse bodies per recipient
+    ctx = build_weekly_spreads_context(week, locked=True)
+    subject = f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads"
+    html_body = render_template("email/weekly_spreads.html", **ctx)
+    try:
+        text_body = render_template("email/weekly_spreads.txt", **ctx)
+    except Exception:
+        text_body = None
+
+    sent = 0
+    failed = []
+
+    # NOTE: Free SendGrid = 100/day. We send one email per recipient.
+    for u in subs:
+        ok = send_email(subject=subject, recipients=u.email, html=html_body, text=text_body)
+        if ok:
+            sent += 1
+        else:
+            failed.append(u.email)
+
+        # tiny pause to be gentle with rate limits (adjust if needed)
+        sleep(0.2)
+
+    msg = f"Weekly email (Week {week}) — attempted {total}, sent {sent}, failed {len(failed)}."
+    if failed:
+        current_app.logger.warning("Weekly bulk send failed for: %s", failed)
+        flash(msg, "warning")
+    else:
+        flash(msg, "success")
+
+    return redirect(url_for("admin.actions", week=week))
+
+def _send_weekly_to_subscribers(week: int) -> tuple[int, int, list[str]]:
+    """Factor the core logic out of your POST admin route so we can reuse it here."""
+    ctx = build_weekly_spreads_context(week, locked=True)
+    subject = f"Week {ctx['week_number']} NFL Spreads"
+    html_body = render_template("email/weekly_spreads.html", **ctx)
+    try:
+        text_body = render_template("email/weekly_spreads.txt", **ctx)
+    except Exception:
+        text_body = None
+
+    subs = (
+        User.query
+        .filter(User.notify_weekly_recap.is_(True))
+        .filter(User.email.isnot(None))
+        .all()
+    )
+    sent, failed = 0, []
+    for u in subs:
+        ok = send_email(subject=subject, recipients=u.email, html=html_body, text=text_body)
+        sent += 1 if ok else 0
+        if not ok:
+            failed.append(u.email)
+    return sent, len(subs), failed
+
+@bp.post("/internal/cron/weekly-email")
+def cron_weekly_email():
+    # Simple shared-secret auth (no login)
+    token = request.args.get("token") or request.headers.get("X-CRON-TOKEN")
+    if not token or token != current_app.config.get("CRON_SECRET"):
+        abort(401)
+
+    week = request.args.get("week", type=int) or current_week_number()
+
+    # DST-safe guard: only run at **local** Tue 12:00 (America/Denver)
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    if now_local.weekday() != 1 or now_local.hour != 12:
+        # Not the target local time → exit quietly so you can schedule multiple UTC times safely
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
+
+    sent, total, failed = _send_weekly_to_subscribers(week)
+    return jsonify({"ok": True, "week": week, "total": total, "sent": sent, "failed": failed}), 200
 
 def get_tzname() -> str:
     tz = getattr(current_user, "timezone", None)

@@ -7,10 +7,15 @@ from app.filters import register_template_utils, abbr_team
 from app.models import Game, Pick, TeamGameATS
 from app.services.picks import remaining_picks_this_week
 import logging, sys
+import os
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(get_config())
+
+    app.config["CRON_SECRET"] = os.getenv("CRON_SECRET", "")
+    if not app.config["CRON_SECRET"]:
+        app.logger.warning("CRON_SECRET is not set; cron endpoint will return 401")
 
     # dev-only niceties
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -35,7 +40,6 @@ def create_app():
     from app.auth import bp as auth_bp; app.register_blueprint(auth_bp, url_prefix="/auth")
     from app.api.routes import bp as api_bp; app.register_blueprint(api_bp)
 
-    
     def _resolve_footer_week():
         # Prefer explicit ?week=; else latest published (locked) week; else None
         w = request.args.get("week", type=int)

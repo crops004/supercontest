@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Reset Password{% endblock %}
+{% block content %}
+<div class="min-h-[calc(100vh-120px)] flex items-center justify-center px-4 bg-background">
+  <section class="w-full max-w-md rounded-2xl border border-border bg-foreground shadow-xl ring-1 ring-border/40">
+    <div class="h-1 w-full bg-secondary rounded-t-2xl"></div>
+    <div class="p-6 md:p-7">
+      <h1 class="text-xl font-semibold text-copy">Set a new password</h1>
+      <p class="mt-1 text-sm text-copy-light">Choose a new password and confirm it.</p>
+
+      <form method="POST" class="mt-6 space-y-4" id="pw-form" novalidate>
+        <div>
+          <label for="new_password" class="block text-sm text-copy-lighter mb-1">New password</label>
+          <input id="new_password" name="new_password" type="password" required
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+        </div>
+
+        <div>
+          <label for="confirm_password" class="block text-sm text-copy-lighter mb-1">Confirm new password</label>
+          <input id="confirm_password" name="confirm_password" type="password" required
+            class="w-full rounded-lg border border-border bg-background text-copy px-3 py-2
+                   focus:outline-none focus:ring-2 focus:ring-primary/40">
+          <p id="pw-match-msg" class="text-xs mt-1 hidden" aria-live="polite"></p>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between">
+          <a href="{{ url_for('auth.login') }}"
+             class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm">
+            <span class="text-copy">Cancel</span>
+          </a>
+          <button id="pw-submit" type="submit" disabled
+            class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2 text-sm font-semibold
+                   opacity-60 cursor-not-allowed">
+            Update password
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const newPw = document.getElementById('new_password');
+  const confPw = document.getElementById('confirm_password');
+  const submit = document.getElementById('pw-submit');
+  const msg = document.getElementById('pw-match-msg');
+
+  function setState(ok) {
+    const base = "w-full rounded-lg border bg-background text-copy px-3 py-2 focus:outline-none focus:ring-2";
+    if (confPw.value.length === 0) {
+      confPw.className = base + " border-border focus:ring-primary/40";
+      msg.classList.add('hidden');
+      submit.disabled = true;
+      submit.classList.add('opacity-60','cursor-not-allowed');
+      return;
+    }
+    msg.classList.remove('hidden');
+    if (ok) {
+      confPw.className = base + " border-green-500 focus:ring-green-500/40";
+      msg.textContent = "Passwords match";
+      msg.className = "text-xs mt-1 text-green-600";
+      submit.disabled = false;
+      submit.classList.remove('opacity-60','cursor-not-allowed');
+    } else {
+      confPw.className = base + " border-red-500 focus:ring-red-500/40";
+      msg.textContent = "Passwords do not match";
+      msg.className = "text-xs mt-1 text-red-600";
+      submit.disabled = true;
+      submit.classList.add('opacity-60','cursor-not-allowed');
+    }
+  }
+  function check(){ setState(newPw.value.length>0 && newPw.value===confPw.value); }
+  newPw.addEventListener('input', check);
+  confPw.addEventListener('input', check);
+})();
+</script>
+{% endblock %}

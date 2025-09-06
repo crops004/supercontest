@@ -87,42 +87,43 @@
   {% set _pb = picks_banner if picks_banner is defined else {'show': False} %}
   {% set _bb = billing_banner if billing_banner is defined else {'show': False} %}
 
-  {# Picks banner (red) #}
-  {% if _pb.show %}
-    <div id="picks-banner"
-        class="sticky z-35 bg-primary text-copy border-b border-border shadow-md shadow-secondary/10"
-        style="top: var(--h-nav);">
-      <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
-        <div>
-          <span class="font-semibold">Picks not finalized for Week
-            <span id="picks-banner-week">{{ _pb.current_week }}</span>
-          </span>
-          <span class="opacity-90"> — <span id="picks-banner-remaining">{{ _pb.remaining }}</span> more to submit.</span>
-        </div>
-        <a id="picks-banner-link" href="{{ _pb.link }}" class="underline font-medium">Make picks →</a>
-      </div>
-    </div>
-  {% else %}
-    <div id="picks-banner" class="hidden"></div>
-  {% endif %}
+  {# Picks banner (primary) — always render skeleton; JS toggles visibility #}
+  {% set _pb = picks_banner if picks_banner is defined else {'show': False, 'current_week': '', 'remaining': '', 'link': url_for('weekly_lines.weekly_lines')} %}
 
-  {# Billing banner (amber) — only if unpaid #}
-  {% if _bb.show %}
-    <div id="billing-banner"
-        class="sticky z-32 bg-amber-500 text-amber-950 border-b border-amber-600"
+  <div id="picks-banner"
+      class="sticky z-35 bg-primary text-primary-content shadow-md shadow-secondary/10 {{ '' if _pb.show else 'hidden' }}"
+      style="top: var(--h-nav);">
+    <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
+      <div>
+        <span class="font-semibold">Picks not finalized for Week
+          <span id="picks-banner-week">{{ _pb.current_week or '' }}</span>
+        </span>
+        <span class="opacity-90"> — <span id="picks-banner-remaining">{{ _pb.remaining or '' }}</span> more to submit.</span>
+      </div>
+      <a id="picks-banner-link" href="{{ _pb.link or url_for('weekly_lines.weekly_lines') }}" class="underline font-medium">Make picks →</a>
+    </div>
+  </div>
+
+  {# Billing banner (amber) — always render skeleton; JS toggles visibility #}
+  {% set _bb = billing_banner if billing_banner is defined else {'show': False, 'link': url_for('main.index')} %}
+
+  <div id="billing-banner"
+        class="sticky z-32 bg-warning text-warning-content shadow-md shadow-secondary/10 {{ '' if _bb.show else 'hidden' }}"
         style="top: calc(var(--h-nav) + var(--h-picks));">
-      <div class="max-w-[1100px] mx-auto px-4 py-2 text-sm flex items-center justify-between gap-4">
-        <div class="font-medium">
-          Payment required to enter this week’s contest.
+      <div class="max-w-[1100px] mx-auto px-4 text-sm flex items-center justify-between gap-4"
+          id="billing-inner" style="min-height: 0;">
+        <div class="font-medium" id="billing-text">
+          League fee not received. Please pay before the start of week 5.
         </div>
-        <a href="{{ _bb.link }}" class="underline font-semibold">Pay now →</a>
+        <a id="billing-link"
+          href="https://venmo.com/u/Joe-Cropsey"
+          target="_blank" rel="noopener noreferrer"
+          class="underline font-semibold">
+          Pay now →
+        </a>
       </div>
     </div>
-  {% else %}
-    <div id="billing-banner" class="hidden"></div>
-  {% endif %}
   {# ------------------------------------------------------------------- #}
-
 
   <!-- Main content -->
   <main class="min-h-[70vh] pb-16 md:pb-16">
@@ -229,38 +230,179 @@
     })();
 
     // --- Picks banner refresher (works with /api/picks/status if present) ---
-    (function () {
-      function $(sel) { return document.querySelector(sel); }
-      function renderBanner(data) {
-        const root = $("#picks-banner");
-        const wkEl = $("#picks-banner-week");
-        const remEl = $("#picks-banner-remaining");
-        if (!root) return;
+        (function () {
+          // Toggle logs via: localStorage.setItem('pbDebug','1') and reload
+          const DBG = () => localStorage.getItem('pbDebug') === '1';
+          const log = (...args) => { if (DBG()) console.log('[picks-banner]', ...args); };
 
-        if (!data || data.finalized || !data.show) {
-          root.classList.add("hidden");
-        } else {
-          root.classList.remove("hidden");
-          if (wkEl) wkEl.textContent = data.current_week ?? "";
-          if (remEl) remEl.textContent = data.remaining ?? "";
-        }
-      }
+          function $(sel) { return document.querySelector(sel); }
 
-      window.refreshPicksBanner = async function () {
-        try {
-          const res = await fetch("/api/picks/status", { credentials: "same-origin" });
-          if (!res.ok) return;
-          const json = await res.json();
-          renderBanner(json);
-        } catch (_) { /* silent */ }
-      };
+          function renderBanner(data) {
+            const root = $("#picks-banner");
+            const wkEl = $("#picks-banner-week");
+            const remEl = $("#picks-banner-remaining");
+            if (!root) { log('renderBanner: no root'); return; }
 
-      // Refresh on page show / tab focus (nice for SPA-like flows)
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") window.refreshPicksBanner();
-      });
-      window.addEventListener("pageshow", () => window.refreshPicksBanner());
-    })();
+            const beforeHidden = root.classList.contains('hidden');
+            if (!data || data.finalized || !data.show) {
+              root.classList.add("hidden");
+            } else {
+              root.classList.remove("hidden");
+              if (wkEl) wkEl.textContent = data.current_week ?? "";
+              if (remEl) remEl.textContent = data.remaining ?? "";
+            }
+            const afterHidden = root.classList.contains('hidden');
+
+            log('renderBanner:',
+                { data, beforeHidden, afterHidden,
+                  text: root.textContent.trim().slice(0,120) });
+
+            if (typeof window.recalcStickyLayout === "function") {
+              window.recalcStickyLayout();
+            }
+          }
+
+          async function fetchJSON(url, init) {
+            const t0 = performance.now();
+            let res, txt = null, json = null;
+            try {
+              res = await fetch(url, init);
+              const ct = res.headers.get('content-type') || '';
+              if (ct.includes('application/json')) {
+                json = await res.json();
+              } else {
+                txt = await res.text();
+              }
+              const t1 = performance.now();
+              log('fetch', { url, status: res.status,
+                            contentType: ct, ms: Math.round(t1 - t0),
+                            xUser: res.headers.get('X-PB-User'),
+                            xRem: res.headers.get('X-PB-Remaining'),
+                            xWk: res.headers.get('X-PB-Week') });
+              if (!res.ok) {
+                log('fetch:not ok body peek →', (json ?? txt)?.toString()?.slice(0,200));
+                return null;
+              }
+              if (json == null) {
+                log('fetch:non-JSON body peek →', (txt ?? '').slice(0,200));
+                return null;
+              }
+              return json;
+            } catch (e) {
+              log('fetch:error', e);
+              return null;
+            }
+          }
+
+          window.refreshPicksBanner = async function () {
+            const url = "/api/picks/status" + `?_=${Date.now()}`;
+            log('refreshPicksBanner: start', { url });
+
+            const json = await fetchJSON(url, {
+              credentials: "same-origin",
+              cache: "no-store",
+              headers: { "Accept": "application/json", "Cache-Control": "no-cache" }
+            });
+
+            if (!json) { log('refreshPicksBanner: no json (likely non-200 or non-JSON)'); return; }
+            renderBanner(json);
+          };
+
+          // ✅ run on first load
+          document.addEventListener("DOMContentLoaded", () => {
+            log('DOMContentLoaded → refresh');
+            window.refreshPicksBanner();
+          });
+          // and again when fully loaded
+          window.addEventListener("load", () => {
+            log('load → refresh');
+            window.refreshPicksBanner();
+          });
+
+        // --- Billing banner refresher (height scales by week) ---
+        (function () {
+          function visible(el) { return !!(el && !el.classList.contains('hidden')); }
+
+          async function refreshBillingBanner() {
+            const root  = document.getElementById('billing-banner');
+            const inner = document.getElementById('billing-inner');
+            const link  = document.getElementById('billing-link');
+            if (!root || !inner) return;
+
+            try {
+              const res = await fetch(`/api/billing/status?_=${Date.now()}`, {
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+              });
+              if (!res.ok) return;
+              const data = await res.json();
+
+              // Show/hide
+              if (!data || !data.show) {
+                root.classList.add('hidden');
+              } else {
+                root.classList.remove('hidden');
+                if (link && data.link) link.href = data.link;
+              }
+
+              // Height scaling: min-height = picksHeight * factor
+              // Measure after picks banner has settled
+              requestAnimationFrame(() => {
+                const picks = document.getElementById('picks-banner');
+                const picksH = visible(picks) ? (picks.offsetHeight || 0) : 0;
+
+                // Fallback base height if picks banner not visible yet
+                const baseH = picksH || 40; // px
+                const factor = Math.max(1, Math.min(4, parseInt(data?.height_factor ?? 1, 10) || 1));
+
+                // Apply min-height to the inner content so the whole banner grows
+                inner.style.minHeight = (baseH * factor) + 'px';
+                inner.style.paddingTop = inner.style.paddingBottom = '0'; // vertical centering via min-height
+                inner.classList.add('py-0'); // neutralize any Tailwind py-* if needed
+
+                // ensure sticky layout vars update
+                if (typeof window.recalcStickyLayout === 'function') window.recalcStickyLayout();
+              });
+            } catch (_) { /* silent */ }
+          }
+
+          // Run at the same moments as picks (and also whenever picks change)
+          document.addEventListener('DOMContentLoaded', refreshBillingBanner);
+          window.addEventListener('load', refreshBillingBanner);
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') refreshBillingBanner();
+          });
+          window.addEventListener('pageshow', refreshBillingBanner);
+
+          // When picks change, the picks banner may appear/disappear → recompute billing placement/height
+          document.addEventListener('picks:changed', refreshBillingBanner);
+
+          // Expose for manual testing
+          window.refreshBillingBanner = refreshBillingBanner;
+        })();
+
+        // refresh on tab focus / back nav
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            log('visibilitychange:visible → refresh');
+            window.refreshPicksBanner();
+          }
+        });
+        window.addEventListener("pageshow", () => {
+          log('pageshow → refresh');
+          window.refreshPicksBanner();
+        });
+
+        // listens for app-level signal that picks changed
+        document.addEventListener("picks:changed", () => {
+          log('event picks:changed → refresh');
+          window.refreshPicksBanner();
+        });
+
+        // Quick manual hook you can run in console
+        window.pbTestRefresh = () => { log('manual pbTestRefresh'); return window.refreshPicksBanner(); };
+      })();
 
     // Toasts (palette-aware)
     window.renderToasts = (flashes) => {

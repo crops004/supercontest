@@ -1,78 +1,79 @@
-{# app/admin/templates/email/_standings_email.html #}
+{# app/admin/templates/email/_standings_email.html (email-safe colors) #}
 {% if standings_rows %}
   <tr>
     <td style="padding:0 20px 18px;">
-      <div style="font:700 16px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); margin:8px 0 10px;">
-        Current Standings <span style="font-weight:400; color:hsl(262 11% 85%);">(after Week {{ prev_week_number }})</span>
+      <div style="font:700 16px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; margin:8px 0 10px;">
+        Current Standings <span style="font-weight:400; color:#d8d5dd;">(after Week {{ prev_week_number }})</span>
       </div>
 
       {% macro pick_chip(p) -%}
         {# p = {"label": "Chargers", "result": "W|L|P|pending|empty"} #}
         {% set r = (p.result|string).upper() %}
-        {% set bg = 'hsl(263 11% 15%)' %}
-        {% set bd = 'hsl(263 10% 25%)' %}
+        {% set bg = '#241f2a' %}  {# default dark chip bg #}
+        {% set bd = '#3e3946' %}  {# default dark chip border #}
         {% if r == 'W' %}
-          {% set bg = 'hsl(120 83% 22% / .35)' %}
-          {% set bd = 'hsl(120 83% 58% / .55)' %}
+          {% set bg = 'rgba(34, 197, 94, 0.30)' %}   {# green 500 @ 30% #}
+          {% set bd = '#22c55e' %}
         {% elif r == 'L' %}
-          {% set bg = 'hsl(0 83% 30% / .30)' %}
-          {% set bd = 'hsl(0 83% 58% / .50)' %}
+          {% set bg = 'rgba(237, 59, 59, 0.30)' %}   {# red @ 30% #}
+          {% set bd = '#ed3b3b' %}
         {% elif r == 'P' %}
-          {% set bg = 'hsl(60 83% 35% / .30)' %}
-          {% set bd = 'hsl(60 83% 58% / .50)' %}
+          {% set bg = 'rgba(234, 179, 8, 0.30)' %}   {# amber @ 30% #}
+          {% set bd = '#eab308' %}
         {% elif r in ('PENDING','EMPTY') %}
-          {% set bg = 'hsl(263 11% 15%)' %}
-          {% set bd = 'hsl(263 10% 25%)' %}
+          {% set bg = '#241f2a' %}
+          {% set bd = '#3e3946' %}
         {% endif %}
         <span style="display:inline-block; min-width:86px; padding:6px 10px; border-radius:9999px;
                      background:{{ bg }}; border:1px solid {{ bd }};
-                     font:500 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); white-space:nowrap; text-align:center;">
+                     font:500 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; white-space:nowrap; text-align:center;">
           {{ p.label or '—' }}
         </span>
       {%- endmacro %}
 
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
-             style="border-collapse:separate; width:100%; background:hsl(263 11% 15%);
-                    border:1px solid hsl(263 10% 25%); border-radius:12px; overflow:hidden;">
+             bgcolor="#241f2a"
+             style="border-collapse:separate; width:100%; background-color:#241f2a;
+                    border:1px solid #3e3946; border-radius:12px; overflow:hidden;">
         <thead>
-          <tr style="background:hsl(263 11% 13%);">
-            <th align="left"  rowspan="2" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">Player</th>
-            <th align="left"  colspan="5" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">Picks</th>
-            <th align="center" colspan="3" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">This Week</th>
-            <th align="center" colspan="3" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">Overall</th>
-            <th align="right" rowspan="2" style="padding:10px 12px; font:700 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); white-space:nowrap;">Pts</th>
+          <tr bgcolor="#1e1a23" style="background-color:#1e1a23;">
+            <th align="left"  rowspan="2" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">Player</th>
+            <th align="left"  colspan="5" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">Picks</th>
+            <th align="center" colspan="3" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">This Week</th>
+            <th align="center" colspan="3" style="padding:10px 12px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">Overall</th>
+            <th align="right" rowspan="2" style="padding:10px 12px; font:700 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; white-space:nowrap;">Pts</th>
           </tr>
-          <tr style="background:hsl(263 11% 13%);">
-            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">1</th>
-            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">2</th>
-            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">3</th>
-            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">4</th>
-            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%);">5</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">W</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">L</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">P</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">W</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">L</th>
-            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(262 11% 85%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">P</th>
+          <tr bgcolor="#1e1a23" style="background-color:#1e1a23;">
+            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">1</th>
+            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">2</th>
+            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">3</th>
+            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">4</th>
+            <th style="padding:8px 8px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946;">5</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">W</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">L</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">P</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">W</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">L</th>
+            <th style="padding:8px 6px; font:600 12px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#d8d5dd; border-bottom:1px solid #3e3946; min-width:28px;">P</th>
           </tr>
         </thead>
         <tbody>
           {% for row in standings_rows %}
             <tr>
-              <td style="padding:10px 12px; font:500 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); white-space:nowrap;">{{ row.name }}</td>
+              <td style="padding:10px 12px; font:500 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; white-space:nowrap;">{{ row.name }}</td>
 
-              {% for p in row.picks %}<td style="padding:10px 8px; border-bottom:1px solid hsl(263 10% 25%);">{{ pick_chip(p) }}</td>{% endfor %}
-              {% for _ in range(5 - (row.picks|length)) %}<td style="padding:10px 8px; border-bottom:1px solid hsl(263 10% 25%);">&nbsp;</td>{% endfor %}
+              {% for p in row.picks %}<td style="padding:10px 8px; border-bottom:1px solid #3e3946;">{{ pick_chip(p) }}</td>{% endfor %}
+              {% for _ in range(5 - (row.picks|length)) %}<td style="padding:10px 8px; border-bottom:1px solid #3e3946;">&nbsp;</td>{% endfor %}
 
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.week_w }}</td>
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.week_l }}</td>
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.week_p }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.week_w }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.week_l }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.week_p }}</td>
 
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.total_w }}</td>
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.total_l }}</td>
-              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%); min-width:28px;">{{ row.total_p }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.total_w }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.total_l }}</td>
+              <td align="center" style="padding:10px 6px; font:600 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946; min-width:28px;">{{ row.total_p }}</td>
 
-              <td align="right"  style="padding:10px 12px; font:700 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:hsl(240 14% 99%); border-bottom:1px solid hsl(263 10% 25%);">{{ "%.1f"|format(row.points) }}</td>
+              <td align="right"  style="padding:10px 12px; font:700 13px system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#fcfcfd; border-bottom:1px solid #3e3946;">{{ "%.1f"|format(row.points) }}</td>
             </tr>
           {% endfor %}
         </tbody>

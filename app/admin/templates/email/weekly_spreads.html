@@ -19,8 +19,8 @@
   </head>
   <body style="
     margin:0; padding:0;
-    background:hsl(264 10% 10%);            /* dark --color-background */
-    color:hsl(240 14% 99%);                 /* dark --color-copy */
+    background:#19171c;                  /* dark background */
+    color:#fcfcfd;                       /* primary text */
     -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;
   ">
     <!-- Preheader (hidden) -->
@@ -28,18 +28,19 @@
       Week {{ week_number }} spreads are live—make your 5 picks now.
     </span>
 
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <!-- Wrapper with explicit bgcolor so email clients honor background -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#19171c" style="background-color:#19171c;">
       <tr>
-        <td align="center">
+        <td align="center" bgcolor="#19171c" style="background-color:#19171c;">
           <!-- Wider container (700px) -->
           <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="700" class="container" style="width:700px; max-width:100%; margin:0 auto;">
             <!-- Header -->
             <tr>
               <td style="padding:28px 20px 12px; text-align:center;">
-                <div class="h1" style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:26px; font-weight:700; color:hsl(240 14% 99%);">
-                  Week {{ week_number }} NFL Spreads
+                <div class="h1" style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:26px; font-weight:700; color:#fcfcfd;">
+                  Week {{ week_number - 1 }} Results / Week {{ week_number }} Spreads
                 </div>
-                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:hsl(262 11% 85%); margin-top:6px;">
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:#d8d5dd; margin-top:6px;">
                   {{ week_date_range_text }}
                 </div>
               </td>
@@ -52,7 +53,7 @@
                   <tr>
                     <td align="center">
                       <a href="{{ weekly_lines_url }}" class="cta"
-                         style="background:hsl(262 83% 58%); color:hsl(0 0% 100%); text-decoration:none; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; padding:12px 20px; border-radius:10px; display:inline-block;">
+                         style="background:#7c3bed; color:#ffffff; text-decoration:none; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; padding:12px 20px; border-radius:10px; display:inline-block;">
                         Make Your Picks
                       </a>
                     </td>
@@ -74,15 +75,15 @@
 
             {% macro spread_pill(text) -%}
               <span style="display:inline-block; min-width:72px; text-align:center; padding:8px 12px;
-                           border:1px solid hsl(263 10% 25%);           /* dark --color-border */
-                           border-radius:9999px; font-size:14px; color:hsl(240 14% 99%);">
+                           border:1px solid #3e3946;            /* dark border */
+                           border-radius:9999px; font-size:14px; color:#fcfcfd;">
                 {{ text }}
               </span>
             {%- endmacro %}
 
             {% macro card(game, time_label) -%}
               {% set g = game %}
-              {% set locked = (g.kickoff_at and now_utc and g.kickoff_at <= now_utc) %}
+              {% set locked = (g.kickoff_at and now_utc and (g.kickoff_at | to_utc_ts) <= (now_utc | to_utc_ts)) %}
               {% set has_spread_actual = (g.spread_home is not none and g.spread_away is not none) %}
               {% set is_pk = (has_spread_actual and g.spread_home == 0 and g.spread_away == 0) %}
               {% set has_spread = (has_spread_actual and (all_locked|default(false))) %}
@@ -90,22 +91,22 @@
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
                      class="card"
                      style="
-                       background:hsl(263 12% 20%);               /* dark --color-secondary-content */
-                       border:1px solid hsl(263 10% 25%);         /* dark --color-border */
+                       background:#322d39;                 /* card bg */
+                       border:1px solid #3e3946;           /* border */
                        border-radius:16px; padding:0; overflow:hidden;
-                       margin-bottom:16px;                          /* more vertical spacing */
+                       margin-bottom:16px;                  /* spacing */
                      ">
                 <!-- top row -->
                 <tr>
-                  <td style="padding:12px 14px; border-bottom:1px solid hsl(263 10% 25%);">
+                  <td style="padding:12px 14px; border-bottom:1px solid #3e3946;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:hsl(262 11% 85%);">
+                        <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#d8d5dd;">
                           {{ time_label }}
                         </td>
                         <td align="right">
                           {% if locked %}
-                            <span style="display:inline-block; font-size:11px; color:hsl(0 83% 58%); border:1px solid hsl(0 83% 58% / 0.25); border-radius:9999px; padding:2px 6px;">
+                            <span style="display:inline-block; font-size:11px; color:#ed3b3b; border:1px solid rgba(237, 59, 59, 0.25); border-radius:9999px; padding:2px 6px;">
                               Locked
                             </span>
                           {% endif %}
@@ -125,7 +126,7 @@
                           <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                             <tr>
                               <td style="padding-right:10px;">{{ team_logo_png(g.away_team) }}</td>
-                              <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:15px; color:hsl(240 14% 99%); white-space:nowrap;">
+                              <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:15px; color:#fcfcfd; white-space:nowrap;">
                                 {{ g.away_team }}
                               </td>
                             </tr>
@@ -155,7 +156,7 @@
                           <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                             <tr>
                               <td style="padding-right:10px;">{{ team_logo_png(g.home_team) }}</td>
-                              <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:15px; color:hsl(240 14% 99%); white-space:nowrap;">
+                              <td style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:15px; color:#fcfcfd; white-space:nowrap;">
                                 {{ g.home_team }}
                               </td>
                             </tr>
@@ -180,7 +181,7 @@
             {%- endmacro %}
 
             {% if groups|length == 0 %}
-              <tr><td style="padding:0 20px 24px; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:hsl(262 11% 85%);">No games for this week.</td></tr>
+              <tr><td style="padding:0 20px 24px; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:#d8d5dd;">No games for this week.</td></tr>
             {% else %}
               {% for day_title, times in groups %}
                 <!-- Day header: prefer nice date if available -->
@@ -189,7 +190,7 @@
                     {% set first_block = times|first %}
                     {% set first_items = first_block[1] if first_block else [] %}
                     {% set first_game  = first_items|first if first_items else None %}
-                    <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:13px; font-weight:600; color:hsl(262 11% 85%);">
+                    <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:13px; font-weight:600; color:#d8d5dd;">
                       {% if first_game and (tzname is defined) %}
                         {{ first_game.kickoff_at | fmt_local(tzname, 'date') }}
                       {% else %}
@@ -227,7 +228,7 @@
                         </td>
 
                         <!-- GUTTER -->
-                        <td style="padding:0; margin:0;">&nbsp;</td>
+                        <td class="gutter" style="padding:0; margin:0;">&nbsp;</td>
 
                         <!-- RIGHT column -->
                         <td valign="top" style="padding:0; margin:0;">
@@ -246,14 +247,14 @@
             <!-- Footer -->
             <tr>
               <td style="padding:8px 20px 26px;">
-                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:hsl(260 10% 65%);">
-                  Times shown in {{ timezone_name }}. Spreads appear only once the week is locked in-app.
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#a39daf;">
+                  Times shown in {{ timezone_name }}.
                 </div>
               </td>
             </tr>
             <tr>
               <td style="padding:0 20px 34px; text-align:center;">
-                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:hsl(262 11% 85%); margin-top:8px;"></div>
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#d8d5dd; margin-top:8px;"></div>
               </td>
             </tr>
 

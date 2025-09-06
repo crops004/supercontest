@@ -44,20 +44,58 @@
 
     <div class="rounded-xl border border-border bg-foreground p-4">
       <h2 class="text-lg font-semibold mb-3">Week Ops</h2>
+
       <div class="flex flex-wrap gap-2">
+        <!-- Prep Week -->
         <form method="post" action="{{ url_for('admin.admin_prep_week', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+          <button
+            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
+            title="Locks all games in Week {{ selected_week }} and snapshots closing lines for each (stores the final spreads)."
+            aria-label="Prep Week {{ selected_week }} (Lock + Snapshot)"
+          >
             Prep Week {{ selected_week }} (Lock + Snapshot)
           </button>
         </form>
+
+        <!-- Lock Weeks Through Current -->
         <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+          <button
+            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
+            title="Locks all weeks up to the current NFL week and snapshots closing lines for any newly locked games."
+            aria-label="Lock Weeks Through Current"
+          >
             Lock Weeks Through Current
           </button>
         </form>
+
+        <!-- Update Scores + Finalize ATS -->
         <form method="post" action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content hover:opacity-90 border border-border">
+          <button
+            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
+            title="Imports recent scores, then finalizes ATS results for completed games in Week {{ selected_week }}."
+            aria-label="Update Scores and Finalize ATS (Week {{ selected_week }})"
+          >
             Update Scores + Finalize ATS (Week {{ selected_week }})
+          </button>
+        </form>
+
+        <!-- Send weekly email to subscribers -->
+        <form
+          action="{{ url_for('admin.send_weekly_spreads_bulk', week=selected_week) }}"
+          method="post"
+          onsubmit="return confirm('Send Week {{ selected_week }} email to {{ recap_count }} subscribers?');"
+          class="inline-block"
+        >
+          {# If you use Flask-WTF/CSRF, include the token: #}
+          {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+
+          <button
+            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sends the Week {{ selected_week }} email via SendGrid to {{ recap_count }} subscribers with weekly recaps enabled. Free plan ~100 emails/day."
+            aria-label="Send weekly email to subscribers"
+            {% if recap_count == 0 %}disabled{% endif %}
+          >
+            Send weekly email to {{ recap_count }} subscribers
           </button>
         </form>
       </div>

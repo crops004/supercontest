@@ -39,13 +39,18 @@
           </label>
 
           <div class="flex gap-2">
+            <a href="{{ url_for('auth.forgot_password') }}"
+              class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm"
+              title="Email a secure, time-limited link to reset your password">
+              <span class="text-copy">Forgot password?</span>
+            </a>
             <a href="{{ url_for('auth.register') }}"
-               class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm">
+              class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm">
               <span class="text-copy">Create account</span>
             </a>
             <button type="submit"
               class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2 text-sm font-semibold
-                     shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
+                    shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
               Sign in
             </button>
           </div>
