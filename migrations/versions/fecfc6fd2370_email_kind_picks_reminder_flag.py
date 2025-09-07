@@ -1,4 +1,4 @@
-"""email kind
+"""email kind + picks reminder flag
 
 Revision ID: fecfc6fd2370
 Revises: 0b9f146c165a
