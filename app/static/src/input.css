@@ -51,18 +51,18 @@
 
   /* picked + not yet scored: brand highlight */
   .chip.spread.picked.pending {
-    @apply bg-primary/20 border-primary text-primary ring-2 ring-primary/40;
+    @apply bg-primary/20 border-primary text-copy-light ring-2 ring-primary/40;
   }
 
   /* Picked & scored chips get a filled background + soft ring */
   .chip.spread.picked.win {
-    @apply bg-success/30  border-success  text-success ring-2 ring-success/40;
+    @apply bg-success/30  border-success  text-copy-light ring-2 ring-success/40;
   }
   .chip.spread.picked.loss {
-    @apply bg-error/30    border-error    text-error ring-2 ring-error/40;
+    @apply bg-error/30    border-error    text-copy-light ring-2 ring-error/40;
   }
   .chip.spread.picked.push {
-    @apply bg-warning/30  border-warning  text-warning ring-2 ring-warning/40;
+    @apply bg-warning/30  border-warning  text-copy-light ring-2 ring-warning/40;
   }
 
   /* disabled/locked visual */
