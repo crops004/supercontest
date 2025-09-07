@@ -11,9 +11,10 @@ from sqlalchemy import func
 from sqlalchemy.sql import sqltypes as T
 from time import sleep
 from zoneinfo import ZoneInfo
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Game, Pick, User, TeamGameATS
+from app.models import Game, Pick, User, TeamGameATS, WeeklyEmailLog, WeeklyEmailRecipientLog
 from app.scoring import points_for_pick
 from app.services.time_utils import day_key, time_key
 from app.filters import abbr_team, team_short  # chips
@@ -437,8 +438,8 @@ def send_weekly_spreads_bulk():
 
     return redirect(url_for("admin.actions", week=week))
 
-def _send_weekly_to_subscribers(week: int) -> tuple[int, int, list[str]]:
-    """Factor the core logic out of your POST admin route so we can reuse it here."""
+def _send_weekly_to_subscribers(week: int, log_row: WeeklyEmailLog) -> tuple[int, int, list[str]]:
+    # Build the email bodies once
     ctx = build_weekly_spreads_context(week, locked=True)
     subject = f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads"
     html_body = render_template("email/weekly_spreads.html", **ctx)
@@ -447,46 +448,128 @@ def _send_weekly_to_subscribers(week: int) -> tuple[int, int, list[str]]:
     except Exception:
         text_body = None
 
+    # Recipients
     subs = (
         User.query
         .filter(User.notify_weekly_recap.is_(True))
         .filter(User.email.isnot(None))
         .all()
     )
-    sent, failed = 0, []
-    for u in subs:
-        ok = send_email(subject=subject, recipients=u.email, html=html_body, text=text_body)
-        sent += 1 if ok else 0
-        if not ok:
-            failed.append(u.email)
-    return sent, len(subs), failed
+
+    total = len(subs)
+    # ✅ explicit attribute assignment (no kwargs to model __init__)
+    log_row.subject = subject
+    log_row.total = total
+    db.session.add(log_row)
+    db.session.commit()
+
+    sent = 0
+    failed_emails: List[str] = []
+
+    for i, u in enumerate(subs, start=1):
+        email = u.email
+        ok = False
+        err: str | None = None
+
+        try:
+            ok = bool(send_email(subject=subject, recipients=email, html=html_body, text=text_body))
+        except Exception as e:
+            ok = False
+            err = repr(e)
+
+        rec = WeeklyEmailRecipientLog()   # ✅ no kwargs
+        rec.log_id = log_row.id
+        rec.email = email
+        rec.status = "sent" if ok else "failed"
+        rec.error = err
+        db.session.add(rec)
+
+        if ok:
+            sent += 1
+        else:
+            failed_emails.append(email)
+
+        # keep transactions reasonable
+        if i % 50 == 0:
+            db.session.commit()
+
+    # finalize
+    log_row.sent = sent
+    log_row.failed = len(failed_emails)
+    log_row.status = "sent"
+    db.session.add(log_row)
+    db.session.commit()
+
+    return sent, total, failed_emails
 
 @bp.post("/internal/cron/weekly-email")
 def cron_weekly_email():
-    # Auth
     token = request.args.get("token") or request.headers.get("X-CRON-TOKEN")
-    secret = current_app.config.get("CRON_SECRET")
-    if not token or token != secret:
+    if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
 
-    week = request.args.get("week", type=int) or current_week_number()
-
-    # Robust force parsing: accepts 1/true/yes/on (any case)
-    raw_force = request.args.get("force", "")
-    force = str(raw_force).strip().lower() in ("1", "true", "yes", "y", "on")
+    week   = request.args.get("week", type=int) or current_week_number()
+    force  = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+    resend = str(request.args.get("resend","")).strip().lower() in ("1", "true", "yes", "y", "on")
 
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    current_app.logger.info(
-        "[cron_weekly_email] week=%s force=%s now_local=%s",
-        week, force, now_local.isoformat()
-    )
+    if not force and (now_local.weekday() != 1 or now_local.hour != 12):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
 
-    if not force:
-        if now_local.weekday() != 1 or now_local.hour != 12:
-            return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
+    subject = f"Week {week} NFL Spreads"
 
-    sent, total, failed = _send_weekly_to_subscribers(week)
-    return jsonify({"ok": True, "week": week, "total": total, "sent": sent, "failed": failed}), 200
+    # Acquire lock row via unique(week)
+    try:
+        lock = WeeklyEmailLog()          # ✅ no kwargs
+        lock.week = week
+        lock.subject = subject
+        lock.status = "started"
+        db.session.add(lock)
+        db.session.commit()
+        acquired = True
+    except IntegrityError:
+        db.session.rollback()
+        existing = WeeklyEmailLog.query.filter_by(week=week).first()
+        if existing is None:
+            # extremely rare: race; create a fresh row
+            lock = WeeklyEmailLog()
+            lock.week = week
+            lock.subject = subject
+            lock.status = "started"
+            db.session.add(lock)
+            db.session.commit()
+            acquired = True
+        elif not resend:
+            return jsonify({"ok": True, "skipped": True, "reason": "already sent (log exists)"}), 200
+        else:
+            # Resend: wipe recipient rows and reset counters
+            WeeklyEmailRecipientLog.query.filter_by(log_id=existing.id).delete(synchronize_session=False)
+            existing.total = 0
+            existing.sent = 0
+            existing.failed = 0
+            existing.status = "started"
+            db.session.add(existing)
+            db.session.commit()
+            lock = existing
+            acquired = False
+
+    try:
+        sent, total, failed_list = _send_weekly_to_subscribers(week, log_row=lock)
+    except Exception:
+        lock.status = "failed"
+        db.session.add(lock)
+        db.session.commit()
+        current_app.logger.exception("[cron_weekly_email] send failed week=%s", week)
+        return jsonify({"ok": False, "error": "send_failed"}), 500
+
+    return jsonify({
+        "ok": True,
+        "week": week,
+        "acquired_lock": acquired,
+        "total": total,
+        "sent": sent,
+        "failed": len(failed_list),
+    }), 200
 
 def get_tzname() -> str:
     tz = getattr(current_user, "timezone", None)
@@ -800,6 +883,8 @@ MODEL_MAP = {
     "games": Game,
     "picks": Pick,
     "ats": TeamGameATS,
+    "email_log": WeeklyEmailLog,
+    "email_recipients": WeeklyEmailRecipientLog,
 }
 
 def _get_model_or_404(name: str):

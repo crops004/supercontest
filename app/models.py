@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from sqlalchemy import Boolean, func, Enum
+from app.extensions import db
 
 class User(UserMixin,db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -98,4 +99,39 @@ class TeamGameATS(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('game_id', 'team', name='uq_team_game_once'),
+    )
+
+class WeeklyEmailLog(db.Model):
+    __tablename__ = "weekly_email_log"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    week       = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    subject    = db.Column(db.String(255), nullable=False)
+    total      = db.Column(db.Integer, nullable=False, default=0)  # # of intended recipients
+    sent       = db.Column(db.Integer, nullable=False, default=0)  # # of successes
+    failed     = db.Column(db.Integer, nullable=False, default=0)  # # of failures
+    status     = db.Column(db.String(20), nullable=False, default="started")  # started|sent|failed
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    recipients = db.relationship(
+        "WeeklyEmailRecipientLog",
+        backref="log",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+
+
+class WeeklyEmailRecipientLog(db.Model):
+    __tablename__ = "weekly_email_recipient_log"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    log_id     = db.Column(db.Integer, db.ForeignKey("weekly_email_log.id"), nullable=False, index=True)
+    email      = db.Column(db.String(255), nullable=False, index=True)
+    status     = db.Column(db.String(20), nullable=False)  # sent|failed
+    error      = db.Column(db.Text, nullable=True)         # last error (if any)
+    sent_at    = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index("ix_recipient_log_logid_email", "log_id", "email"),
     )
