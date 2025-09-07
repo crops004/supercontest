@@ -32,7 +32,23 @@
           <span class="text-[11px] md:text-sm text-copy-light mb-1">Your picks this week:</span>
           <div id="footer-picks-list" class="flex flex-wrap gap-2 mb-1.5">
             {% for p in footer_committed_picks or [] %}
-              <span class="chip {{ p.ats|chip_class }}">{{ p.abbr }}</span>
+              <span class="chip {{ p|chip_class_ats_computed }}"
+      title="
+        has_game={{ 'yes' if p.game else 'no' }}
+        h={{ p.game.final_score_home if p.game else 'None' }}
+        a={{ p.game.final_score_away if p.game else 'None' }}
+        sh={{ p.game.spread_home if p.game else 'None' }}
+        sa={{ p.game.spread_away if p.game else 'None' }}
+        pick_abbr={{ p.abbr }}
+        pick_team={{ p.chosen_team or p.team or p.team_name }}
+        home_abbr={{ p.game.home_team|abbr_team if p.game else 'None' }}
+        away_abbr={{ p.game.away_team|abbr_team if p.game else 'None' }}
+        home_name={{ p.game.home_team if p.game else 'None' }}
+        away_name={{ p.game.away_team if p.game else 'None' }}
+        cls={{ p|chip_class_ats_computed }}
+      ">
+  {{ p.abbr }}
+</span>
             {% endfor %}
             {% for _ in range(5 - (footer_committed_picks|length)) %}
               <span class="chip placeholder">—</span>

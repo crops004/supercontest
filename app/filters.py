@@ -1,8 +1,10 @@
 from __future__ import annotations
-from typing import Optional
-from app.models import Game  # OK to import models here
+from typing import Optional, Any, cast
+from decimal import Decimal
+from app.models import Game
 from app.services.time_utils import to_local, round5
 from datetime import timezone
+from app import db
 
 
 TEAM_ABBR = {
@@ -44,6 +46,80 @@ NICK_TO_CITY = {
 }
 
 # ---- Filters ----
+def _as_float(x: Any) -> Optional[float]:
+    if x is None:
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+def _get(obj, name):
+    """Get attr or key from obj (works for dataclasses/ORM models AND dicts)."""
+    return obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+
+def _ats(side: str, h: float, a: float, sh: float, sa: float) -> str:
+    adj, opp = (h + sh, a) if side == "home" else (a + sa, h)
+    if adj > opp:  return "win"
+    if adj < opp:  return "loss"
+    return "push"
+
+def chip_class_ats_computed(pick) -> str:
+    """
+    Compute 'win'|'loss'|'push'|'pending' for a footer pick.
+    Works with dict-based footer payloads or ORM objects.
+    """
+    # Game object/dict (prefer the payload; fallback to DB by id)
+    g = _get(pick, "game")
+    if not g:
+        gid = _get(pick, "game_id")
+        if gid is None:
+            return "pending"
+        g = db.session.get(Game, int(gid))
+        if not g:
+            return "pending"
+
+    # Read numbers from object OR dict
+    h_f  = _as_float(_get(g, "final_score_home"))
+    a_f  = _as_float(_get(g, "final_score_away"))
+    sh_f = _as_float(_get(g, "spread_home"))
+    sa_f = _as_float(_get(g, "spread_away"))
+    if None in (h_f, a_f, sh_f, sa_f):
+        return "pending"
+
+    # Team identities
+    home_name = _get(g, "home_team")
+    away_name = _get(g, "away_team")
+    home_abbr = abbr_team(home_name) if home_name else None
+    away_abbr = abbr_team(away_name) if away_name else None
+
+    # What the pick says
+    pick_abbr = _get(pick, "abbr")
+    pick_team = _get(pick, "chosen_team") or _get(pick, "team") or _get(pick, "team_name")
+    side = None
+
+    # Resolve side robustly
+    if pick_abbr and pick_abbr in (home_abbr, away_abbr):
+        side = "home" if pick_abbr == home_abbr else "away"
+    elif pick_team:
+        pt = str(pick_team).strip()
+        if pt in (home_name, away_name):
+            side = "home" if pt == home_name else "away"
+        else:
+            pt_abbr = abbr_team(pt)
+            if pt_abbr and pt_abbr in (home_abbr, away_abbr):
+                side = "home" if pt_abbr == home_abbr else "away"
+
+    if not side:
+        return "pending"
+
+    h  = cast(float, h_f)
+    a  = cast(float, a_f)
+    sh = cast(float, sh_f)
+    sa = cast(float, sa_f)
+
+    return _ats(side, h, a, sh, sa)
+
 def team_short(name: Optional[str]) -> str:
     """Last word of team name ('Washington Commanders' -> 'Commanders')."""
     if not name:
@@ -198,5 +274,6 @@ def register_template_utils(app):
     app.add_template_filter(chip_tw,    "chip_tw")  
     app.add_template_filter(team_city,  "team_city")
     app.add_template_filter(to_utc_ts,  "to_utc_ts")     
+    app.add_template_filter(chip_class_ats_computed, "chip_class_ats_computed")
     # Globals
     app.add_template_global(is_pickem,  "is_pickem")
