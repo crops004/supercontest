@@ -105,7 +105,8 @@ class WeeklyEmailLog(db.Model):
     __tablename__ = "weekly_email_log"
 
     id         = db.Column(db.Integer, primary_key=True)
-    week       = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    week       = db.Column(db.Integer, nullable=False, index=True)
+    kind       = db.Column(db.String(32), nullable=False, default="weekly", server_default="weekly")
     subject    = db.Column(db.String(255), nullable=False)
     total      = db.Column(db.Integer, nullable=False, default=0)  # # of intended recipients
     sent       = db.Column(db.Integer, nullable=False, default=0)  # # of successes
@@ -119,6 +120,10 @@ class WeeklyEmailLog(db.Model):
         backref="log",
         lazy="dynamic",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("week", "kind", name="uq_week_kind"),
     )
 
 

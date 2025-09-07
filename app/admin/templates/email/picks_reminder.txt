@@ -1,0 +1,7 @@
+Finish your Week {{ week_number }} picks
+
+If you received this, you still have picks to submit for {{ week_date_range_text }}.
+
+Make picks now: {{ weekly_lines_url }}
+
+(Tip: you can change picks until each game kicks off.)

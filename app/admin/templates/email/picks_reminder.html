@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Reminder: finish your Week {{ week_number }} picks</title>
+    <style>
+      /* Mobile tweaks */
+      @media only screen and (max-width: 620px) {
+        .container { width:100% !important; padding:0 12px !important; }
+        .h1 { font-size:22px !important; }
+        .cta { width:100% !important; display:block !important; }
+      }
+    </style>
+  </head>
+  <body style="
+    margin:0; padding:0;
+    background:#19171c;          /* dark background */
+    color:#fcfcfd;               /* primary text */
+    -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;
+  ">
+    <!-- Preheader (hidden) -->
+    <span style="display:none; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;">
+      You still have picks to submit for Week {{ week_number }} — make your picks now.
+    </span>
+
+    <!-- Wrapper with explicit bgcolor so clients honor it -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#19171c" style="background-color:#19171c;">
+      <tr>
+        <td align="center" bgcolor="#19171c" style="background-color:#19171c;">
+          <!-- Main container (600px for maximum compatibility) -->
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" class="container" style="width:600px; max-width:100%; margin:0 auto;">
+            
+            <!-- Header -->
+            <tr>
+              <td style="padding:28px 20px 12px; text-align:center;">
+                <div class="h1" style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:26px; font-weight:700; color:#fcfcfd;">
+                  Finish your Week {{ week_number }} picks
+                </div>
+              </td>
+            </tr>
+
+            <!-- Lead copy -->
+            <tr>
+              <td style="padding:0 20px 10px; text-align:center;">
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:#d8d5dd;">
+                  {% if remaining_picks is defined and remaining_picks is not none %}
+                    If you received this, you still have <strong>{{ remaining_picks }}</strong> pick{{ 's' if remaining_picks != 1 else '' }} to submit for this week.
+                  {% else %}
+                    If you received this, you still have picks to submit for this week.
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+              <td style="padding:6px 20px 22px;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:separate;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ weekly_lines_url }}" class="cta"
+                         style="background:#7c3bed; color:#ffffff; text-decoration:none; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; padding:12px 20px; border-radius:10px; display:inline-block;">
+                        Make picks now
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Note -->
+            <tr>
+              <td style="padding:0 20px 28px; text-align:center;">
+                <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:13px; color:#a39daf;">
+                  You can change picks until kickoff of each game.
+                </div>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

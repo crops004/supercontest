@@ -98,6 +98,27 @@
             Send weekly email to {{ recap_count }} subscribers
           </button>
         </form>
+
+        <form method="post"
+              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
+              onsubmit="return confirm('Send reminder for Week {{ selected_week }} to {{ reminder_count }} users?');"
+              class="inline-block">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  {% if reminder_count==0 %}disabled{% endif %}>
+            Send pick reminder to {{ reminder_count }}
+          </button>
+        </form>
+
+        <form method="post"
+              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
+              onsubmit="return confirm('Re-send the picks reminder for Week {{ selected_week }}?');"
+              class="inline-block">
+          <input type="hidden" name="resend" value="1">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed">
+            Re-send picks reminder
+          </button>
+        </form>
+
       </div>
     </div>
   </div>

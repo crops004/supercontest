@@ -16,7 +16,6 @@ from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS, WeeklyEmailLog, WeeklyEmailRecipientLog
 from app.scoring import points_for_pick
-from app.services.time_utils import day_key, time_key
 from app.filters import abbr_team, team_short  # chips
 from app.emailer import send_email
 
@@ -29,6 +28,8 @@ from app.services.games_sync import (
 )
 from app.services.week import current_week_number
 from app.services.ats import snapshot_closing_lines_for_game, finalize_ats_for_game
+from app.services.time_utils import day_key, time_key
+from app.services.picks import remaining_picks_this_week
 
 from . import bp  # use the blueprint from __init__.py
 
@@ -59,25 +60,51 @@ def index():
 @bp.get("/actions")
 @login_required
 def actions():
+    # ---- figure out which week to show, same logic you already had ----
     week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
-    weeks: List[int] = [w for (w,) in week_rows] or [0]
+    weeks: list[int] = [w for (w,) in week_rows] or [0]
     current_wk = current_week_number()
+
     selected_week = request.args.get("week", type=int)
     if selected_week is None:
         selected_week = current_wk if current_wk in weeks else (weeks[-1] if weeks else 0)
     elif selected_week not in weeks and weeks:
         selected_week = weeks[-1]
 
-    # NEW: count recipients
+    # ---- counts for buttons ----
+    # weekly email recipients (opt-in flag you already use)
     recap_count = (
-        db.session.query(User)
-        .filter(User.notify_weekly_recap.is_(True))
-        .filter(User.email.isnot(None))
-        .count()
+        User.query
+            .filter(User.email.isnot(None))
+            .filter(User.notify_weekly_recap.is_(True))
+            .count()
     )
 
-    return render_template("actions.html", weeks=weeks, selected_week=selected_week, recap_count=recap_count)
+    # picks reminder recipients: users who (a) have email, (b) opted in (notify_picks_reminder),
+    # and (c) still have remaining picks for selected_week.
+    picks_per_week = int(current_app.config.get("PICKS_PER_WEEK", 5))
 
+    # pull candidates in one query…
+    candidates = (
+        User.query
+            .filter(User.email.isnot(None))
+            .filter(User.notify_picks_reminder.is_(True))   # make sure you've added this column/migration
+            .all()
+    )
+
+    reminder_count = 0
+    for u in candidates:
+        remaining, wk = remaining_picks_this_week(u.id, picks_per_week)
+        if wk == selected_week and remaining and remaining > 0:
+            reminder_count += 1
+
+    return render_template(
+        "actions.html",
+        weeks=weeks,
+        selected_week=selected_week,
+        recap_count=recap_count,
+        reminder_count=reminder_count,
+    )
 
 # actions (POST) stay the same, just redirect to admin.actions
 @bp.post("/import-lines")
@@ -796,6 +823,176 @@ def _build_standings_rows_for_email(prev_week: int):
     for i, r in enumerate(rows, start=1):
         r["rank"] = i
     return rows
+
+def _build_reminder_ctx(week: int):
+    # You can reuse whatever you used for date range on weekly emails
+    # Here we keep it minimal
+    return {
+        "week_number": week,
+        "week_date_range_text": "",  # fill if you have a helper
+        "weekly_lines_url": url_for("weekly_lines.weekly_lines", week=week, _external=True),
+        "timezone_name": "MT",
+    }
+
+def _users_missing_picks(week: int, picks_per_week: int):
+    q = (User.query
+         .filter(User.email.isnot(None))
+         .filter(User.notify_picks_reminder.is_(True)))
+    result = []
+    for u in q.all():
+        remaining, wk = remaining_picks_this_week(u.id, picks_per_week)
+        if wk == week and remaining and remaining > 0:
+            result.append((u, remaining))
+    return result
+
+@bp.get("/email/picks-reminder/preview")
+@login_required
+def preview_picks_reminder():
+    week = request.args.get("week", type=int) or current_week_number()
+    ctx = _build_reminder_ctx(week)
+    return render_template("email/picks_reminder.html", **ctx)
+
+@bp.get("/email/picks-reminder/preview.txt")
+@login_required
+def preview_picks_reminder_txt():
+    week = request.args.get("week", type=int) or current_week_number()
+    ctx = _build_reminder_ctx(week)
+    return render_template("email/picks_reminder.txt", **ctx), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+def _send_picks_reminder_to_incomplete(week: int, log_row: WeeklyEmailLog) -> tuple[int, int, list[str]]:
+    ctx = _build_reminder_ctx(week)
+    subject = f"Reminder: finish your Week {week} picks"
+    html_body = render_template("email/picks_reminder.html", **ctx)
+    text_body = render_template("email/picks_reminder.txt", **ctx)
+
+    picks_per_week = int(current_app.config.get("PICKS_PER_WEEK", 5))
+    subs = _users_missing_picks(week, picks_per_week)
+
+    total = len(subs)
+    log_row.subject = subject
+    log_row.total = total
+    current_app.logger.info("[picks-reminder] week=%s recipients=%s", week, total)
+    db.session.add(log_row); db.session.commit()
+
+    sent = 0
+    failed: list[str] = []
+
+    for i, (u, remaining) in enumerate(subs, start=1):
+        email = u.email
+        ok = False
+        err = None
+        try:
+            ok = bool(send_email(subject=subject, recipients=email, html=html_body, text=text_body))
+        except Exception as e:
+            ok = False
+            err = repr(e)
+
+        rec = WeeklyEmailRecipientLog()
+        rec.log_id = log_row.id
+        rec.email = email
+        rec.status = "sent" if ok else "failed"
+        rec.error = err
+        db.session.add(rec)
+
+        if ok:
+            sent += 1
+        else:
+            failed.append(email)
+
+        if i % 50 == 0:
+            db.session.commit()
+
+    log_row.sent = sent
+    log_row.failed = len(failed)
+    log_row.status = "sent"
+    db.session.add(log_row); db.session.commit()
+    return sent, total, failed
+
+@bp.route("/email/picks-reminder/send", methods=["GET", "POST"])
+@login_required
+def send_picks_reminder_manual():
+    week = request.args.get("week", type=int) or request.form.get("week", type=int) or current_week_number()
+    resend = str(request.args.get("resend") or request.form.get("resend") or "").strip().lower() in ("1","true","yes","y","on")
+
+    # Acquire a (week, kind='reminder') lock in weekly_email_log
+    try:
+        lock = WeeklyEmailLog()
+        lock.week = week
+        lock.kind = "reminder"
+        lock.subject = f"Reminder: finish your Week {week} picks"
+        lock.status = "started"
+        db.session.add(lock)
+        db.session.commit()
+        acquired = True
+    except IntegrityError:
+        # A log row already exists for (week, reminder)
+        db.session.rollback()
+        existing = WeeklyEmailLog.query.filter_by(week=week, kind="reminder").first()
+
+        if not existing:
+            flash("Existing reminder log not found; please try again.", "error")
+            return redirect(url_for("admin.actions", week=week))
+
+        if not resend:
+            flash(f"Reminder for week {week} already sent or queued. Use Re-send to force it.", "warning")
+            return redirect(url_for("admin.actions", week=week))
+
+        # Re-send: clear recipient rows and reset counters
+        WeeklyEmailRecipientLog.query.filter_by(log_id=existing.id).delete(synchronize_session=False)
+        existing.total = 0
+        existing.sent = 0
+        existing.failed = 0
+        existing.status = "started"
+        db.session.add(existing)
+        db.session.commit()
+        lock = existing
+        acquired = False
+
+    # Do the send
+    try:
+        sent, total, failed = _send_picks_reminder_to_incomplete(week, lock)
+        flash(f"Reminder (Week {week}) — attempted {total}, sent {sent}, failed {len(failed)}.", "success" if not failed else "warning")
+    except Exception:
+        lock.status = "failed"
+        db.session.add(lock); db.session.commit()
+        current_app.logger.exception("[picks-reminder manual] failed week=%s", week)
+        flash("Reminder send failed. See logs.", "error")
+
+    return redirect(url_for("admin.actions", week=week))
+
+
+@bp.post("/internal/cron/picks-reminder")
+def cron_picks_reminder():
+    token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
+    if not token or token != current_app.config.get("CRON_SECRET"):
+        abort(401)
+
+    week  = request.args.get("week", type=int) or current_week_number()
+    force = str(request.args.get("force","")).lower() in ("1","true","yes","y","on")
+
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    if not force and not (now_local.weekday() == 6 and now_local.hour == 10):  # Sunday=6
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Sun 10:00"}), 200
+
+    try:
+        lock = WeeklyEmailLog()
+        lock.week = week
+        lock.kind = "reminder"
+        lock.subject = f"Reminder: finish your Week {week} picks"
+        lock.status = "started"
+        db.session.add(lock); db.session.commit()
+        acquired = True
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"ok": True, "skipped": True, "reason": "already sent (week,kind)"}), 200
+
+    try:
+        sent, total, failed = _send_picks_reminder_to_incomplete(week, lock)
+        return jsonify({"ok": True, "week": week, "total": total, "sent": sent, "failed": len(failed)}), 200
+    except Exception:
+        lock.status = "failed"; db.session.add(lock); db.session.commit()
+        current_app.logger.exception("[cron picks-reminder] failed week=%s", week)
+        return jsonify({"ok": False, "error": "send_failed"}), 500
 
 
 # ------------------------------------------------------------
