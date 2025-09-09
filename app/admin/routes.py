@@ -152,6 +152,159 @@ def admin_refresh_spreads():
     )
     return redirect(url_for("admin.actions", week=request.args.get("week", type=int)))
 
+# --- helpers -------------------------------------------------
+
+def _lock_and_snapshot_week(week: int, *, line_source: str) -> tuple[int, int]:
+    """
+    Locks all games in `week` (if not already), then snapshots closing lines for all locked games in that week.
+    Returns (locked_now_count, snap_count).
+    """
+    games = Game.query.filter(Game.week == week).all()
+
+    locked_now = 0
+    for g in games:
+        if not getattr(g, "spread_is_locked", False):
+            g.spread_is_locked = True
+            locked_now += 1
+
+    snap = 0
+    for g in games:
+        if getattr(g, "spread_is_locked", False):
+            snapshot_closing_lines_for_game(g, line_source=line_source)
+            snap += 1
+
+    db.session.commit()
+    return locked_now, snap
+
+
+# --- TUESDAY MIDDAY: refresh unlocked spreads, then lock+snapshot selected week ----
+
+@bp.post("/tuesday-lock-cycle")
+@login_required
+def admin_tuesday_lock_cycle():
+    """
+    Intended for Tuesday ~11:30 AM MDT:
+      1) Refresh spreads for UNLOCKED games (any week)
+      2) Lock & snapshot the selected week (new week's closing lines baseline)
+    """
+    week = request.args.get("week", type=int) or request.form.get("week", type=int)
+    if week is None:
+        flash("No week specified.", "error")
+        return redirect(url_for("admin.actions"))
+
+    res = refresh_spreads_unlocked()
+    locked_now, snap = _lock_and_snapshot_week(week, line_source="Admin/TuesdayCycle")
+
+    flash(
+        f"Tuesday cycle complete — Refreshed (unlocked only): "
+        f"created={res['created']} updated={res['updated']} skipped_locked={res['skipped_locked']}; "
+        f"Week {week} locked={locked_now}, snapshots={snap}.",
+        "success"
+    )
+    return redirect(url_for("admin.actions", week=week))
+
+
+# --- CRON: same as above, but authenticated & time-gated --------------------------
+
+@bp.post("/internal/cron/tuesday-lock-cycle")
+def cron_tuesday_lock_cycle():
+    """
+    Secure cron endpoint you can schedule for Tue 11:30 AM America/Denver.
+    Query params:
+      - week (int): week to lock/snapshot (defaults to current_week_number())
+      - force: 1/true to bypass the Tue 11:30 check
+    """
+    token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
+    if not token or token != current_app.config.get("CRON_SECRET"):
+        abort(401)
+
+    week = request.args.get("week", type=int) or current_week_number()
+    force = str(request.args.get("force","")).strip().lower() in ("1","true","yes","y","on")
+
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    # Tue (weekday=1) at 11:30
+    in_window = (now_local.weekday() == 1 and now_local.hour == 11 and now_local.minute >= 30)
+    if not force and not in_window:
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 11:30+"}), 200
+
+    res = refresh_spreads_unlocked()
+    locked_now, snap = _lock_and_snapshot_week(week, line_source="Cron/TuesdayCycle")
+
+    return jsonify({
+        "ok": True,
+        "week": week,
+        "refresh": res,
+        "locked_now": locked_now,
+        "snapshots": snap,
+    }), 200
+
+# --- helper: finalize ATS for a given week ------------------------------------
+
+def _finalize_week_ats(week: int, *, days_from: int = 3) -> dict:
+    """
+    Import recent scores (past `days_from` days), then finalize ATS for all
+    completed games in `week`. Returns a summary dict.
+    """
+    res_scores = import_all_scores(days_from=days_from)
+
+    games = Game.query.filter(Game.week == week).all()
+    finalized = 0
+    for g in games:
+        if g.final_score_home is not None and g.final_score_away is not None:
+            finalize_ats_for_game(g)
+            finalized += 1
+
+    db.session.commit()
+    return {
+        "week": week,
+        "updated_scores": res_scores.get("updated_scores", 0),
+        "unchanged": res_scores.get("unchanged", 0),
+        "missing_game": res_scores.get("missing_game", 0),
+        "finalized_ats": finalized,
+        "days_from": days_from,
+    }
+
+
+# --- CRON: finalize last week's ATS at Tue 00:00 local -------------------------
+
+@bp.post("/internal/cron/finalize-ats")
+def cron_finalize_ats():
+    """
+    Secure cron endpoint for the Mon night/Tue morning job.
+    Default behavior:
+      - Targets LAST week (current_week_number() - 1).
+      - Only runs at local Tue 00:00 America/Denver unless ?force=1.
+    Optional query params:
+      - week: int (override target week)
+      - days_from: int (default 3)
+      - force: 1/true to bypass the time gate
+    """
+    token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
+    if not token or token != current_app.config.get("CRON_SECRET"):
+        abort(401)
+
+    # determine target week (default = previous week)
+    cur = current_week_number()
+    default_week = max(1, (cur or 1) - 1)
+    week = request.args.get("week", type=int) or default_week
+
+    days_from = request.args.get("days_from", type=int) or 3
+    force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    # Gate: Tuesday at 00:00 local (we allow minute==0 to 5 to be tolerant)
+    in_window = (now_local.weekday() == 1 and now_local.hour == 0 and now_local.minute <= 5)
+
+    if not force and not in_window:
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 00:00"}), 200
+
+    try:
+        summary = _finalize_week_ats(week, days_from=days_from)
+        return jsonify({"ok": True, **summary}), 200
+    except Exception:
+        current_app.logger.exception("[cron finalize-ats] failed week=%s", week)
+        return jsonify({"ok": False, "error": "finalize_failed"}), 500
+    
 @bp.post("/prep-week")
 @login_required
 def admin_prep_week():

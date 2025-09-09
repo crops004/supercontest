@@ -75,7 +75,6 @@
   .chips {
     @apply mt-2 flex flex-wrap gap-2;
   }
-}
 
 /* Make the `dark:` variant follow data-theme if you ever use `dark:` utilities */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
@@ -83,6 +82,9 @@
 /* ===== LIGHT THEME (DEFAULT) — applies with NO data-theme attribute ===== */
 /* ========== LIGHT THEME (default) ========== */
 @theme {
+  /* fonts */
+  --font-trainone: 'Train One', system-ui, sans-serif;
+
   /* shared brand colors */
   --color-primary: hsl(262 83% 58%);
   --color-primary-content: hsl(0 0% 100%);

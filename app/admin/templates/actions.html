@@ -8,6 +8,7 @@
     <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
   </div>
 
+  <!-- Week chooser -->
   <form method="get" class="mb-4 flex items-center gap-2">
     <label class="flex items-center gap-2">
       <span class="text-copy-light">Week:</span>
@@ -21,7 +22,74 @@
   </form>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <!-- Communications (emails) -->
     <div class="rounded-xl border border-border bg-foreground p-4">
+      <h2 class="text-lg font-semibold mb-3">Communications</h2>
+      <div class="flex flex-wrap gap-2">
+        <!-- Weekly spreads bulk -->
+        <form
+          action="{{ url_for('admin.send_weekly_spreads_bulk', week=selected_week) }}"
+          method="post"
+          onsubmit="return confirm('Send Week {{ selected_week }} email to {{ recap_count }} subscribers?');"
+        >
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Sends the Week {{ selected_week }} email via SendGrid to {{ recap_count }} subscribers."
+                  {% if recap_count == 0 %}disabled{% endif %}>
+            Send weekly email to {{ recap_count }} subscribers
+          </button>
+        </form>
+
+        <!-- Picks reminder (manual) -->
+        <form method="post"
+              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
+              onsubmit="return confirm('Send reminder for Week {{ selected_week }} to {{ reminder_count }} users?');">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  {% if reminder_count==0 %}disabled{% endif %}>
+            Send pick reminder to {{ reminder_count }}
+          </button>
+        </form>
+
+        <!-- Picks reminder (re-send) -->
+        <form method="post"
+              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
+              onsubmit="return confirm('Re-send the picks reminder for Week {{ selected_week }}?');">
+          <input type="hidden" name="resend" value="1">
+          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40">
+            Re-send picks reminder
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Week Ops (just the two you described) -->
+    <div class="rounded-xl border border-border bg-foreground p-4">
+      <h2 class="text-lg font-semibold mb-3">Week Ops</h2>
+      <div class="flex flex-wrap gap-2">
+        <!-- Post-week finalize (unchanged) -->
+        <form method="post" action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}">
+          <button
+            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
+            title="Imports recent scores, then finalizes ATS for completed games in Week {{ selected_week }}."
+          >
+            Update Scores + Finalize ATS (Week {{ selected_week }})
+          </button>
+        </form>
+
+        <!-- Tuesday 11:30 combo: refresh unlocked spreads, then lock+snapshot selected week -->
+        <form method="post" action="{{ url_for('admin.admin_tuesday_lock_cycle', week=selected_week) }}">
+          <button
+            class="px-4 py-2 rounded-lg bg-primary text-primary-content border border-border hover:bg-primary-dark"
+            title="Refresh spreads (UNLOCKED only), then lock & snapshot Week {{ selected_week }}."
+          >
+            Tuesday Cycle: Refresh → Lock & Snapshot (Week {{ selected_week }})
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Data Imports -->
+    <div class="rounded-xl border border-border bg-foreground p-4 md:col-span-2">
       <h2 class="text-lg font-semibold mb-3">Data Imports</h2>
       <div class="flex flex-wrap gap-2">
         <form method="post" action="{{ url_for('admin.admin_import_lines', week=selected_week) }}">
@@ -29,98 +97,29 @@
             Import Lines (Regular Season)
           </button>
         </form>
+
         <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}">
           <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
             Import Scores (last 3 days)
           </button>
         </form>
+
         <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}">
           <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
             Refresh Spreads (Unlocked Only)
           </button>
         </form>
-      </div>
-    </div>
 
-    <div class="rounded-xl border border-border bg-foreground p-4">
-      <h2 class="text-lg font-semibold mb-3">Week Ops</h2>
-
-      <div class="flex flex-wrap gap-2">
-        <!-- Prep Week -->
-        <form method="post" action="{{ url_for('admin.admin_prep_week', week=selected_week) }}">
-          <button
-            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
-            title="Locks all games in Week {{ selected_week }} and snapshots closing lines for each (stores the final spreads)."
-            aria-label="Prep Week {{ selected_week }} (Lock + Snapshot)"
-          >
-            Prep Week {{ selected_week }} (Lock + Snapshot)
-          </button>
-        </form>
-
-        <!-- Lock Weeks Through Current -->
+        <!-- Moved here -->
         <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}">
-          <button
-            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
-            title="Locks all weeks up to the current NFL week and snapshots closing lines for any newly locked games."
-            aria-label="Lock Weeks Through Current"
-          >
+          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border"
+                  title="Locks all weeks up to the current NFL week and snapshots closing lines for newly locked games.">
             Lock Weeks Through Current
           </button>
         </form>
-
-        <!-- Update Scores + Finalize ATS -->
-        <form method="post" action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}">
-          <button
-            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
-            title="Imports recent scores, then finalizes ATS results for completed games in Week {{ selected_week }}."
-            aria-label="Update Scores and Finalize ATS (Week {{ selected_week }})"
-          >
-            Update Scores + Finalize ATS (Week {{ selected_week }})
-          </button>
-        </form>
-
-        <!-- Send weekly email to subscribers -->
-        <form
-          action="{{ url_for('admin.send_weekly_spreads_bulk', week=selected_week) }}"
-          method="post"
-          onsubmit="return confirm('Send Week {{ selected_week }} email to {{ recap_count }} subscribers?');"
-          class="inline-block"
-        >
-          {# If you use Flask-WTF/CSRF, include the token: #}
-          {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
-
-          <button
-            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Sends the Week {{ selected_week }} email via SendGrid to {{ recap_count }} subscribers with weekly recaps enabled. Free plan ~100 emails/day."
-            aria-label="Send weekly email to subscribers"
-            {% if recap_count == 0 %}disabled{% endif %}
-          >
-            Send weekly email to {{ recap_count }} subscribers
-          </button>
-        </form>
-
-        <form method="post"
-              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
-              onsubmit="return confirm('Send reminder for Week {{ selected_week }} to {{ reminder_count }} users?');"
-              class="inline-block">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
-                  {% if reminder_count==0 %}disabled{% endif %}>
-            Send pick reminder to {{ reminder_count }}
-          </button>
-        </form>
-
-        <form method="post"
-              action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
-              onsubmit="return confirm('Re-send the picks reminder for Week {{ selected_week }}?');"
-              class="inline-block">
-          <input type="hidden" name="resend" value="1">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed">
-            Re-send picks reminder
-          </button>
-        </form>
-
       </div>
     </div>
+
   </div>
 </div>
 {% endblock %}

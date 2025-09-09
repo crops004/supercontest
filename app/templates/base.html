@@ -2,6 +2,10 @@
 <html lang="en"> <!-- no data-theme by default = LIGHT -->
 
 <head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Train+One&display=swap" rel="stylesheet">
+
   <meta charset="UTF-8">
   <title>{% block title %}Supercontest{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -43,7 +47,12 @@
     class="sticky top-0 z-40 bg-foreground text-copy border-b border-border px-6 py-3 flex justify-between items-center"
     role="navigation" aria-label="Primary">
     <div>
-      <a href="{{ url_for('main.index') }}" class="font-bold hover:text-copy-light">🏈</a>
+      <a href="{{ url_for('weekly_lines.weekly_lines') }}"
+        class="flex items-center gap-2">
+        <span class="font-trainone text-secondary text-xl sm:text-2xl leading-none tracking-wide text-shadow-lg text-shadow-primary/80 hover:text-shadow-xl hover:text-shadow-primary">
+  Super Contest
+</span>
+      </a>
     </div>
 
     {% set ep = request.endpoint or '' %}
