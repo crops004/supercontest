@@ -209,34 +209,49 @@ def admin_tuesday_lock_cycle():
 @bp.post("/internal/cron/tuesday-lock-cycle")
 def cron_tuesday_lock_cycle():
     """
-    Secure cron endpoint you can schedule for Tue 11:30 AM America/Denver.
+    Refresh spreads for UNLOCKED games, then lock & snapshot a target week.
+    Runs whenever called.
+
     Query params:
-      - week (int): week to lock/snapshot (defaults to current_week_number())
-      - force: 1/true to bypass the Tue 11:30 check
+      - week: int (default = current_week_number())
+      - dry_run: 1/true to simulate (no commit)
     """
     token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
     if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
 
     week = request.args.get("week", type=int) or current_week_number()
-    force = str(request.args.get("force","")).strip().lower() in ("1","true","yes","y","on")
+    dry_run = str(request.args.get("dry_run", "")).strip().lower() in ("1","true","yes","y","on")
 
-    now_local = datetime.now(ZoneInfo("America/Denver"))
-    # Tue (weekday=1) at 11:30
-    in_window = (now_local.weekday() == 1 and now_local.hour == 11 and now_local.minute >= 30)
-    if not force and not in_window:
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 11:30+"}), 200
+    try:
+        if dry_run:
+            res = refresh_spreads_unlocked()  # reads/writes spreads for unlocked; allow this preview write?
+            games = Game.query.filter(Game.week == week).all()
+            would_lock = sum(1 for g in games if not getattr(g, "spread_is_locked", False))
+            # We *won’t* actually flip locks or snapshot in dry_run: just report
+            return jsonify({
+                "ok": True,
+                "dry_run": True,
+                "week": week,
+                "refresh": res,
+                "would_lock": would_lock,
+                "would_snapshot": len(games),  # snapshot runs on all locked in that week
+            }), 200
 
-    res = refresh_spreads_unlocked()
-    locked_now, snap = _lock_and_snapshot_week(week, line_source="Cron/TuesdayCycle")
+        res = refresh_spreads_unlocked()
+        locked_now, snap = _lock_and_snapshot_week(week, line_source="Cron/TuesdayCycle")
 
-    return jsonify({
-        "ok": True,
-        "week": week,
-        "refresh": res,
-        "locked_now": locked_now,
-        "snapshots": snap,
-    }), 200
+        return jsonify({
+            "ok": True,
+            "week": week,
+            "refresh": res,
+            "locked_now": locked_now,
+            "snapshots": snap,
+        }), 200
+
+    except Exception:
+        current_app.logger.exception("[cron tuesday-lock-cycle] failed week=%s", week)
+        return jsonify({"ok": False, "error": "tuesday_cycle_failed"}), 500
 
 # --- helper: finalize ATS for a given week ------------------------------------
 
@@ -270,37 +285,46 @@ def _finalize_week_ats(week: int, *, days_from: int = 3) -> dict:
 @bp.post("/internal/cron/finalize-ats")
 def cron_finalize_ats():
     """
-    Secure cron endpoint for the Mon night/Tue morning job.
-    Default behavior:
-      - Targets LAST week (current_week_number() - 1).
-      - Only runs at local Tue 00:00 America/Denver unless ?force=1.
-    Optional query params:
-      - week: int (override target week)
+    Finalize ATS for a target week, anytime this endpoint is called.
+    Defaults to LAST week (current_week_number() - 1).
+
+    Query params:
+      - week: int (override target week; default = current_week_number()-1)
       - days_from: int (default 3)
-      - force: 1/true to bypass the time gate
+      - dry_run: 1/true to simulate and return what would happen (no commit)
     """
     token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
     if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
 
-    # determine target week (default = previous week)
     cur = current_week_number()
     default_week = max(1, (cur or 1) - 1)
     week = request.args.get("week", type=int) or default_week
-
     days_from = request.args.get("days_from", type=int) or 3
-    force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
-
-    now_local = datetime.now(ZoneInfo("America/Denver"))
-    # Gate: Tuesday at 00:00 local (we allow minute==0 to 5 to be tolerant)
-    in_window = (now_local.weekday() == 1 and now_local.hour == 0 and now_local.minute <= 5)
-
-    if not force and not in_window:
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 00:00"}), 200
+    dry_run = str(request.args.get("dry_run", "")).strip().lower() in ("1","true","yes","y","on")
 
     try:
+        if dry_run:
+            # Simulate score import only (don’t change DB state)
+            res_scores = import_all_scores(days_from=days_from)
+            games = Game.query.filter(Game.week == week).all()
+            can_finalize = sum(
+                1 for g in games if g.final_score_home is not None and g.final_score_away is not None
+            )
+            return jsonify({
+                "ok": True,
+                "dry_run": True,
+                "week": week,
+                "updated_scores": res_scores.get("updated_scores", 0),
+                "unchanged": res_scores.get("unchanged", 0),
+                "missing_game": res_scores.get("missing_game", 0),
+                "would_finalize_ats": can_finalize,
+                "days_from": days_from,
+            }), 200
+
         summary = _finalize_week_ats(week, days_from=days_from)
         return jsonify({"ok": True, **summary}), 200
+
     except Exception:
         current_app.logger.exception("[cron finalize-ats] failed week=%s", week)
         return jsonify({"ok": False, "error": "finalize_failed"}), 500
