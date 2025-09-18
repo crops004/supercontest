@@ -111,7 +111,7 @@ class ChatMessage(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     body = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now())
-    updated_at = db.Column(db.DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc), onupdate=func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=True, onupdate=func.now())
 
     __table_args__ = (
         db.Index('ix_chat_messages_created_at', 'created_at'),
