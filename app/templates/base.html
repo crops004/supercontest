@@ -206,6 +206,7 @@
       let latestMessageId = null;
       let lastSeenMessageId = null;
       let unreadCount = 0;
+      let editingMessageId = null;
 
       try {
         const stored = localStorage.getItem(storageKey);
@@ -313,6 +314,7 @@
         const wrapper = document.createElement('article');
         wrapper.className = 'rounded-lg border border-border bg-background/90 px-3 py-2 text-sm';
         wrapper.dataset.chatMessageId = message.id;
+        const ownMessage = isOwnMessage(message);
 
         const meta = document.createElement('div');
         meta.className = 'mb-1 flex items-center justify-between text-xs text-copy-light';
@@ -327,9 +329,20 @@
         time.textContent = formatRelativeTime(message ? message.created_at : '');
         metaRight.appendChild(time);
 
+        if (ownMessage) {
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.dataset.chatEditAction = 'start';
+          editButton.className = 'rounded-full p-1 text-copy-light transition hover:text-secondary focus:outline-none focus:ring-2 focus:ring-secondary/40';
+          editButton.setAttribute('aria-label', 'Edit message');
+          editButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="currentColor" class="h-4 w-4"><path d="M100.4 417.2C104.5 402.6 112.2 389.3 123 378.5L304.2 197.3L338.1 163.4C354.7 180 389.4 214.7 442.1 267.4L476 301.3L442.1 335.2L260.9 516.4C250.2 527.1 236.8 534.9 222.2 539L94.4 574.6C86.1 576.9 77.1 574.6 71 568.4C64.9 562.2 62.6 553.3 64.9 545L100.4 417.2zM156 413.5C151.6 418.2 148.4 423.9 146.7 430.1L122.6 517L209.5 492.9C215.9 491.1 221.7 487.8 226.5 483.2L155.9 413.5zM510 267.4C493.4 250.8 458.7 216.1 406 163.4L372 129.5C398.5 103 413.4 88.1 416.9 84.6C430.4 71 448.8 63.4 468 63.4C487.2 63.4 505.6 71 519.1 84.6L554.8 120.3C568.4 133.9 576 152.3 576 171.4C576 190.5 568.4 209 554.8 222.5C551.3 226 536.4 240.9 509.9 267.4z"/></svg>`;
+          metaRight.appendChild(editButton);
+        }
+
         const edited = document.createElement('span');
         edited.className = 'hidden text-[0.65rem] uppercase tracking-wide text-secondary';
         edited.textContent = 'edited';
+        edited.dataset.chatEditedFlag = '';
         if (message && message.updated_at && message.updated_at !== message.created_at) edited.classList.remove('hidden');
         metaRight.appendChild(edited);
 
@@ -344,13 +357,168 @@
         bodyWrap.dataset.chatBody = '';
         bodyWrap.appendChild(body);
 
+        const editInput = document.createElement('textarea');
+        editInput.className = 'hidden w-full rounded-lg border border-border bg-foreground px-2 py-1 text-sm text-copy focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/40';
+        editInput.dataset.chatEditInput = '';
+        editInput.setAttribute('rows', '3');
+        editInput.value = message && message.body ? message.body : '';
+        bodyWrap.appendChild(editInput);
+
         wrapper.appendChild(meta);
         wrapper.appendChild(bodyWrap);
+
+        if (ownMessage) {
+          const actions = document.createElement('div');
+          actions.className = 'mt-2 hidden items-center gap-2 text-xs';
+          actions.dataset.chatEditActions = '';
+
+          const saveButton = document.createElement('button');
+          saveButton.type = 'button';
+          saveButton.dataset.chatEditAction = 'save';
+          saveButton.className = 'rounded px-2 py-1 font-semibold text-secondary transition hover:text-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/40';
+          saveButton.textContent = 'Save';
+          actions.appendChild(saveButton);
+
+          const cancelButton = document.createElement('button');
+          cancelButton.type = 'button';
+          cancelButton.dataset.chatEditAction = 'cancel';
+          cancelButton.className = 'rounded px-2 py-1 font-medium text-copy-light transition hover:text-copy focus:outline-none focus:ring-2 focus:ring-border/60';
+          cancelButton.textContent = 'Cancel';
+          actions.appendChild(cancelButton);
+
+          wrapper.appendChild(actions);
+        }
+
         return wrapper;
+      }
+
+      function replaceMessageNode(message) {
+        if (!messagesWrap) return;
+        const existing = messagesWrap.querySelector(`[data-chat-message-id="${message.id}"]`);
+        if (!existing) return;
+        const replacement = buildMessageNode(message);
+        messagesWrap.replaceChild(replacement, existing);
+      }
+
+      function getMessageNodeParts(messageId) {
+        if (!messagesWrap) return null;
+        const node = messagesWrap.querySelector(`[data-chat-message-id="${messageId}"]`);
+        if (!node) return null;
+        const bodyWrap = node.querySelector('[data-chat-body]');
+        const body = bodyWrap ? bodyWrap.querySelector('p') : null;
+        const input = bodyWrap ? bodyWrap.querySelector('[data-chat-edit-input]') : null;
+        return {
+          node,
+          bodyWrap,
+          body,
+          input,
+          editBtn: node.querySelector('[data-chat-edit-action="start"]'),
+          saveBtn: node.querySelector('[data-chat-edit-action="save"]'),
+          cancelBtn: node.querySelector('[data-chat-edit-action="cancel"]'),
+          actions: node.querySelector('[data-chat-edit-actions]'),
+        };
+      }
+
+      function startEditingMessage(messageId, options = {}) {
+        const parts = getMessageNodeParts(messageId);
+        const message = messageStore.get(messageId);
+        if (!parts || !parts.body || !parts.input || !message) return;
+        if (editingMessageId && editingMessageId !== messageId) {
+          cancelEditingMessage(editingMessageId, { revert: true });
+        }
+        editingMessageId = messageId;
+        parts.node.dataset.editing = 'true';
+        parts.body.classList.add('hidden');
+        parts.input.classList.remove('hidden');
+        const initialValue = options.draftValue !== undefined
+          ? options.draftValue
+          : (message.body || '');
+        parts.input.value = initialValue;
+        parts.editBtn?.classList.add('hidden');
+        parts.actions?.classList.remove('hidden');
+        parts.saveBtn?.removeAttribute('disabled');
+        parts.cancelBtn?.removeAttribute('disabled');
+        parts.saveBtn?.classList.remove('opacity-70');
+        const isLastMessage = !parts.node.nextElementSibling;
+        const shouldFocus = options.focus !== false;
+        requestAnimationFrame(() => {
+          if (isLastMessage) ensureScrollToBottom();
+          if (!shouldFocus || !parts.input) return;
+          try {
+            parts.input.focus();
+            const length = parts.input.value.length;
+            if (typeof parts.input.setSelectionRange === 'function') {
+              parts.input.setSelectionRange(length, length);
+            }
+          } catch (_) {}
+        });
+      }
+
+      function cancelEditingMessage(messageId, options = {}) {
+        const parts = getMessageNodeParts(messageId);
+        const message = messageStore.get(messageId);
+        if (!parts || !parts.body || !parts.input) return;
+        if (options.revert !== false && message) {
+          parts.body.textContent = message.body || '';
+          parts.input.value = message.body || '';
+        }
+        parts.node.dataset.editing = 'false';
+        parts.body.classList.remove('hidden');
+        parts.input.classList.add('hidden');
+        parts.editBtn?.classList.remove('hidden');
+        parts.actions?.classList.add('hidden');
+        parts.saveBtn?.removeAttribute('disabled');
+        parts.cancelBtn?.removeAttribute('disabled');
+        parts.saveBtn?.classList.remove('opacity-70');
+        if (editingMessageId === messageId) editingMessageId = null;
+      }
+
+      async function saveEditingMessage(messageId) {
+        const parts = getMessageNodeParts(messageId);
+        const message = messageStore.get(messageId);
+        if (!parts || !message || !parts.input) return;
+        const rawValue = parts.input.value || '';
+        const value = rawValue.trim();
+        if (!value) {
+          setStatus('Message cannot be empty');
+          requestAnimationFrame(() => parts.input?.focus());
+          return;
+        }
+        if (value === (message.body || '').trim()) {
+          cancelEditingMessage(messageId, { revert: true });
+          return;
+        }
+        parts.saveBtn?.setAttribute('disabled', 'true');
+        parts.cancelBtn?.setAttribute('disabled', 'true');
+        if (parts.saveBtn) parts.saveBtn.classList.add('opacity-70');
+        setStatus('Saving edit...');
+        try {
+          const updated = await updateMessage(messageId, value);
+          messageStore.set(messageId, updated);
+          replaceMessageNode(updated);
+          editingMessageId = null;
+          setStatus('Edited');
+          setTimeout(() => setStatus('Online'), 1200);
+        } catch (error) {
+          console.error('[chat] update error', error);
+          setStatus(error && error.message ? error.message : 'Unable to edit');
+          parts.saveBtn?.removeAttribute('disabled');
+          parts.cancelBtn?.removeAttribute('disabled');
+          if (parts.saveBtn) parts.saveBtn.classList.remove('opacity-70');
+        }
       }
 
       function renderMessages(messages) {
         if (!messagesWrap) return;
+        const activeEditId = editingMessageId;
+        let draftValue;
+        if (activeEditId) {
+          const activeParts = getMessageNodeParts(activeEditId);
+          if (activeParts && activeParts.input) draftValue = activeParts.input.value;
+        }
+
+        messageStore.clear();
+        if (!activeEditId) editingMessageId = null;
         messagesWrap.innerHTML = '';
 
         if (!Array.isArray(messages) || messages.length === 0) {
@@ -369,6 +537,15 @@
           messagesWrap.appendChild(buildMessageNode(message));
         });
         ensureScrollToBottom();
+
+        if (activeEditId) {
+          const message = messageStore.get(activeEditId);
+          if (message) {
+            startEditingMessage(activeEditId, { draftValue });
+          } else {
+            editingMessageId = null;
+          }
+        }
 
         latestMessageId = messages[messages.length - 1].id;
         if (lastSeenMessageId === null) {
@@ -407,6 +584,24 @@
         });
         if (!response.ok) {
           let detail = 'Unable to send message';
+          try {
+            const err = await response.json();
+            if (err && (err.description || err.error)) detail = err.description || err.error;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+        return response.json();
+      }
+
+      async function updateMessage(messageId, body) {
+        const response = await fetch(`${API_BASE}/messages/${messageId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body })
+        });
+        if (!response.ok) {
+          let detail = 'Unable to edit message';
           try {
             const err = await response.json();
             if (err && (err.description || err.error)) detail = err.description || err.error;
@@ -545,6 +740,36 @@
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             form.requestSubmit();
+          }
+        });
+      }
+
+      if (messagesWrap) {
+        messagesWrap.addEventListener('click', (event) => {
+          const button = event.target.closest('[data-chat-edit-action]');
+          if (!button) return;
+          const wrapper = button.closest('[data-chat-message-id]');
+          if (!wrapper) return;
+          const messageId = Number(wrapper.dataset.chatMessageId);
+          if (!Number.isFinite(messageId)) return;
+          const action = button.dataset.chatEditAction;
+          if (action === 'start') startEditingMessage(messageId);
+          else if (action === 'cancel') cancelEditingMessage(messageId, { revert: true });
+          else if (action === 'save') saveEditingMessage(messageId);
+        });
+
+        messagesWrap.addEventListener('keydown', (event) => {
+          if (!event.target.matches('[data-chat-edit-input]')) return;
+          const wrapper = event.target.closest('[data-chat-message-id]');
+          if (!wrapper) return;
+          const messageId = Number(wrapper.dataset.chatMessageId);
+          if (!Number.isFinite(messageId)) return;
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelEditingMessage(messageId, { revert: true });
+          } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            saveEditingMessage(messageId);
           }
         });
       }
