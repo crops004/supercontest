@@ -1,0 +1,41 @@
+<aside class="flex h-full flex-col bg-foreground text-copy shadow-xl">
+  <header class="flex items-center justify-between border-b border-border px-4 py-3">
+    <div>
+      <h2 class="text-lg font-semibold">Community Chat</h2>
+      <p class="text-xs text-copy-light">Say hi to the league. Keep it friendly and on topic.</p>
+    </div>
+    <button type="button" class="close-chat inline-flex h-8 w-8 items-center justify-center rounded-full text-copy-lighter transition hover:bg-background/60 hover:text-copy" aria-label="Close chat">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+        <path d="M6.225 4.811l-.007.007a1 1 0 000 1.414L10.586 10.6l-4.368 4.368a1 1 0 101.414 1.414l4.368-4.369 4.368 4.369a1 1 0 101.414-1.414L12.414 10.6l4.368-4.368a1 1 0 00-1.414-1.414L11 9.186 6.632 4.818a1 1 0 00-1.407-.007z" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="flex-1 overflow-y-auto px-4 py-3" data-chat-scroll>
+    <div class="space-y-3" data-chat-messages>
+      <!-- Messages render here via JS -->
+      <div class="rounded-lg border border-border bg-background/80 px-3 py-2 text-sm text-copy-light">
+        <p>Welcome! This feed updates live once wired to the API.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-border bg-background px-4 py-3">
+    <form data-chat-form class="flex flex-col gap-2">
+      <label class="text-xs font-medium text-copy-lighter" for="chat-message">Send a message</label>
+      <textarea id="chat-message" name="message" rows="3"
+        class="w-full rounded-lg border border-border bg-foreground px-3 py-2 text-sm text-copy placeholder:text-copy-light focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/40"
+        placeholder="Share your thoughts..."></textarea>
+      <div class="flex items-center justify-between text-xs text-copy-light">
+        <span data-chat-status>Online</span>
+        <button type="submit"
+          class="inline-flex items-center gap-1 rounded-lg bg-secondary px-3 py-2 text-sm font-semibold text-secondary-content transition hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/60">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
+            <path d="M2.394 3.309a1 1 0 011.285-.538l17 7a1 1 0 010 1.858l-17 7A1 1 0 012 18.7v-5.382l9-1.318-9-1.318V4.3a1 1 0 01.394-.991z" />
+          </svg>
+          Send
+        </button>
+      </div>
+    </form>
+  </footer>
+</aside>

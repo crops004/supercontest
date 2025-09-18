@@ -86,25 +86,25 @@
   --font-trainone: 'Train One', system-ui, sans-serif;
 
   /* shared brand colors */
-  --color-primary: hsl(262 83% 58%);
-  --color-primary-content: hsl(0 0% 100%);
-  --color-primary-dark: hsl(262 84% 48%);
-  --color-primary-light: hsl(262 83% 68%);
+  --color-primary: hsl(267, 60%, 33%);
+  --color-primary-content: hsl(267, 60%, 83%);
+  --color-primary-dark: hsl(267, 59%, 23%);
+  --color-primary-light: hsl(267, 60%, 43%);
 
-  --color-secondary: hsl(42 83% 58%);
-  --color-secondary-content: hsl(42 85% 8%);
-  --color-secondary-dark: hsl(42 84% 48%);
-  --color-secondary-light: hsl(42 83% 68%);
+  --color-secondary: hsl(46, 100%, 51%);
+  --color-secondary-content: hsl(48, 100%, 1%);
+  --color-secondary-dark: hsl(46, 100%, 41%);
+  --color-secondary-light: hsl(46, 100%, 61%);
 
   /* LIGHT surface + text */
-  --color-background: hsl(260 10% 94%);
-  --color-foreground: hsl(240 14% 99%);
-  --color-extra-foreground: hsl(220 16% 99%);
-  --color-border: hsl(260 9% 87%);
+  --color-background: hsl(266, 23%, 94%);
+  --color-foreground: hsl(270, 25%, 98%);
+  --color-border: hsl(266, 22%, 87%);
+  --color-extra-foreground: hsl(267, 23%, 90%);
 
-  --color-copy: hsl(263 11% 15%);
-  --color-copy-light: hsl(261 10% 40%);
-  --color-copy-lighter: hsl(261 10% 55%);
+  --color-copy: hsl(0, 0%, 15%);
+  --color-copy-light: hsl(0, 0%, 40%);
+  --color-copy-lighter: hsl(0, 0%, 55%);
 
   /* status */
   --color-success: hsl(120 83% 58%);
@@ -119,14 +119,14 @@
 /* ========== DARK OVERRIDES ========== */
 :where([data-theme="dark"], [data-theme="dark"] *) {
   /* only the six that change */
-  --color-background: hsl(264 10% 10%);
-  --color-foreground: hsl(263 11% 15%);
-  --color-extra-foreground: hsl(263 12% 20%);
-  --color-border: hsl(263 10% 25%);
-
-  --color-copy: hsl(240 14% 99%);
-  --color-copy-light: hsl(262 11% 85%);
-  --color-copy-lighter: hsl(260 10% 65%);
+  --color-background: hsl(267, 22%, 10%);
+  --color-foreground: hsl(265, 22%, 15%);
+  --color-border: hsl(267, 23%, 25%);
+  --color-extra-foreground: hsl(267, 23%, 30%);
+  
+  --color-copy: hsl(270, 25%, 98%);
+  --color-copy-light: hsl(268, 22%, 85%);
+  --color-copy-lighter: hsl(267, 22%, 65%);
 }
 
 /* @theme {

@@ -117,7 +117,7 @@
   {% set _bb = billing_banner if billing_banner is defined else {'show': False, 'link': url_for('main.index')} %}
 
   <div id="billing-banner"
-        class="sticky z-32 bg-warning text-warning-content shadow-md shadow-secondary/10 {{ '' if _bb.show else 'hidden' }}"
+        class="sticky z-32 bg-secondary text-warning-content shadow-md shadow-secondary/10 {{ '' if _bb.show else 'hidden' }}"
         style="top: calc(var(--h-nav) + var(--h-picks));">
       <div class="max-w-[1100px] mx-auto px-4 text-sm flex items-center justify-between gap-4"
           id="billing-inner" style="min-height: 0;">
@@ -145,9 +145,419 @@
     {% include "partials/footer.html" %}
   </footer>
 
+
+
+{% if current_user.is_authenticated %}
+  <!-- Chat sidebar handle + drawer -->
+  <button id="chat-handle" type="button" aria-controls="chat-drawer" aria-expanded="false"
+    class="fixed top-1/2 right-0 z-40 flex items-center gap-2 rounded-l-lg bg-secondary px-3 py-2 text-sm font-semibold text-secondary-content shadow-lg transition hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/60 transform -translate-y-1/2">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+      <path d="M4 4a2 2 0 012-2h12a2 2 0 012 2v11a2 2 0 01-2 2h-6.586l-3.707 3.707A1 1 0 017 20.293V17H6a2 2 0 01-2-2V4z" />
+    </svg>
+    <span class="hidden sm:inline">Chat</span>
+    <span id="chat-unread-badge" class="absolute -top-2 -left-2 hidden h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-semibold text-error-content shadow-md pointer-events-none">0</span>
+  </button>
+
+  <div id="chat-drawer" class="fixed inset-y-0 right-0 z-50 flex max-w-full pointer-events-none" data-open="false" aria-hidden="true" data-current-user-id="{{ current_user.get_id() if current_user.is_authenticated else '' }}">
+    <div data-chat-backdrop class="hidden flex-1 bg-black/40 opacity-0 transition-opacity duration-200 ease-out"></div>
+    <div data-chat-panel class="relative h-full w-screen max-w-[360px] translate-x-full transform transition-transform duration-300 ease-out pointer-events-auto will-change-transform">
+      {% include "partials/chat_panel.html" %}
+      <button type="button" data-chat-edge class="absolute left-0 top-1/2 z-10 -translate-x-full -translate-y-1/2 rounded-l-lg bg-secondary px-3 py-2 text-xs font-semibold text-secondary-content shadow-md transition hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/60 close-chat hidden" aria-label="Hide chat">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4">
+          <path d="M13.25 17.25a.75.75 0 001.28.53l4.72-4.72a.75.75 0 000-1.06l-4.72-4.72a.75.75 0 00-1.28.53v9.44zm-5.5 1.5a.75.75 0 001.5 0v-12a.75.75 0 00-1.5 0v12z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+{% endif %}
+
   {% block scripts %}
   <!-- Toast stack -->
-  <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
+  
+    <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <script>
+    (function () {
+      const API_BASE = '/api/chat';
+      const handle = document.getElementById('chat-handle');
+      const drawer = document.getElementById('chat-drawer');
+      if (!handle || !drawer) return;
+
+      const currentUserId = drawer.dataset.currentUserId || '';
+      if (!currentUserId) return;
+
+      const panel = drawer.querySelector('[data-chat-panel]');
+      const backdrop = drawer.querySelector('[data-chat-backdrop]');
+      const edgeHandle = drawer.querySelector('[data-chat-edge]');
+      const closeButtons = drawer.querySelectorAll('.close-chat');
+      const form = drawer.querySelector('[data-chat-form]');
+      const textarea = form ? form.querySelector('textarea') : null;
+      const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+      const messagesWrap = drawer.querySelector('[data-chat-messages]');
+      const scrollRegion = drawer.querySelector('[data-chat-scroll]');
+      const statusEl = drawer.querySelector('[data-chat-status]');
+      const badge = document.getElementById('chat-unread-badge');
+
+      const storageKey = `chat:lastSeen:${currentUserId}`;
+      const messageStore = new Map();
+      let pollTimer = null;
+      let closeTimer = null;
+      let isFetching = false;
+      let latestMessageId = null;
+      let lastSeenMessageId = null;
+      let unreadCount = 0;
+
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored !== null) {
+          const parsed = Number(stored);
+          if (!Number.isNaN(parsed)) lastSeenMessageId = parsed;
+        }
+      } catch (error) {
+        console.warn('[chat] unable to read lastSeen', error);
+      }
+
+      function setStatus(text) {
+        if (statusEl) statusEl.textContent = text || '';
+      }
+
+      function isOpen() {
+        return drawer.dataset.open === 'true';
+      }
+
+      function ensureScrollToBottom() {
+        if (!scrollRegion) return;
+        requestAnimationFrame(() => {
+          scrollRegion.scrollTop = scrollRegion.scrollHeight;
+        });
+      }
+
+      function focusTextarea() {
+        if (!textarea) return;
+        requestAnimationFrame(() => {
+          if (!textarea) return;
+          try {
+            if (typeof textarea.focus === 'function') {
+              try {
+                textarea.focus({ preventScroll: true });
+              } catch (_) {
+                textarea.focus();
+              }
+            }
+            const length = textarea.value ? textarea.value.length : 0;
+            if (typeof textarea.setSelectionRange === 'function') {
+              textarea.setSelectionRange(length, length);
+            }
+          } catch (error) {
+            console.warn('[chat] focus failed', error);
+          }
+        });
+      }
+
+      function formatRelativeTime(value) {
+        if (!value) return '';
+        const timestamp = Number(new Date(value));
+        if (!Number.isFinite(timestamp)) return '';
+        const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+        if (diffSeconds < 30) return 'now';
+        const units = [
+          { label: 'year', seconds: 31557600 },
+          { label: 'month', seconds: 2628000 },
+          { label: 'week', seconds: 604800 },
+          { label: 'day', seconds: 86400 },
+          { label: 'hour', seconds: 3600 },
+          { label: 'min', seconds: 60 }
+        ];
+        for (const unit of units) {
+          if (diffSeconds >= unit.seconds) {
+            const amount = Math.floor(diffSeconds / unit.seconds);
+            const label = unit.label === 'min' ? (amount === 1 ? 'min' : 'mins') : `${unit.label}${amount === 1 ? '' : 's'}`;
+            return `${amount} ${label} ago`;
+          }
+        }
+        return 'now';
+      }
+
+      function saveLastSeen(id) {
+        if (!Number.isFinite(id)) return;
+        lastSeenMessageId = id;
+        try {
+          localStorage.setItem(storageKey, String(id));
+        } catch (error) {
+          console.warn('[chat] unable to persist lastSeen', error);
+        }
+      }
+
+      function updateBadge() {
+        if (!badge) return;
+        if (unreadCount > 0 && !isOpen()) {
+          badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+
+      function markAllRead() {
+        if (!Number.isFinite(latestMessageId)) return;
+        saveLastSeen(latestMessageId);
+        unreadCount = 0;
+        updateBadge();
+      }
+
+      function isOwnMessage(message) {
+        return message && message.user && String(message.user.id) === String(currentUserId);
+      }
+
+      function buildMessageNode(message) {
+        const wrapper = document.createElement('article');
+        wrapper.className = 'rounded-lg border border-border bg-background/90 px-3 py-2 text-sm';
+        wrapper.dataset.chatMessageId = message.id;
+
+        const meta = document.createElement('div');
+        meta.className = 'mb-1 flex items-center justify-between text-xs text-copy-light';
+
+        const author = document.createElement('span');
+        author.textContent = message && message.user && message.user.display_name ? message.user.display_name : 'Someone';
+
+        const metaRight = document.createElement('div');
+        metaRight.className = 'flex items-center gap-2';
+
+        const time = document.createElement('span');
+        time.textContent = formatRelativeTime(message ? message.created_at : '');
+        metaRight.appendChild(time);
+
+        const edited = document.createElement('span');
+        edited.className = 'hidden text-[0.65rem] uppercase tracking-wide text-secondary';
+        edited.textContent = 'edited';
+        if (message && message.updated_at && message.updated_at !== message.created_at) edited.classList.remove('hidden');
+        metaRight.appendChild(edited);
+
+        meta.appendChild(author);
+        meta.appendChild(metaRight);
+
+        const body = document.createElement('p');
+        body.className = 'whitespace-pre-wrap break-words text-copy';
+        body.textContent = message && message.body ? message.body : '';
+
+        const bodyWrap = document.createElement('div');
+        bodyWrap.dataset.chatBody = '';
+        bodyWrap.appendChild(body);
+
+        wrapper.appendChild(meta);
+        wrapper.appendChild(bodyWrap);
+        return wrapper;
+      }
+
+      function renderMessages(messages) {
+        if (!messagesWrap) return;
+        messagesWrap.innerHTML = '';
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'rounded-lg border border-dashed border-border px-3 py-4 text-center text-sm text-copy-light';
+          empty.textContent = 'No messages yet. Be the first to start the chat!';
+          messagesWrap.appendChild(empty);
+          unreadCount = 0;
+          updateBadge();
+          latestMessageId = null;
+          return;
+        }
+
+        messages.forEach((message) => {
+          messageStore.set(message.id, message);
+          messagesWrap.appendChild(buildMessageNode(message));
+        });
+        ensureScrollToBottom();
+
+        latestMessageId = messages[messages.length - 1].id;
+        if (lastSeenMessageId === null) {
+          unreadCount = messages.filter((message) => !isOwnMessage(message)).length;
+        } else {
+          unreadCount = messages.filter((message) => message.id > lastSeenMessageId && !isOwnMessage(message)).length;
+        }
+
+        if (isOpen()) markAllRead();
+        else updateBadge();
+      }
+
+      async function fetchMessages(options = {}) {
+        if (isFetching) return;
+        isFetching = true;
+        try {
+          const response = await fetch(`${API_BASE}/messages`, { credentials: 'include' });
+          if (!response.ok) throw new Error('Unable to load messages');
+          const data = await response.json();
+          renderMessages(Array.isArray(data.messages) ? data.messages : []);
+          if (options.announce) setStatus('Online');
+        } catch (error) {
+          console.error('[chat] fetch error', error);
+          setStatus('Offline');
+        } finally {
+          isFetching = false;
+        }
+      }
+
+      async function sendMessage(body) {
+        const response = await fetch(`${API_BASE}/messages`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body })
+        });
+        if (!response.ok) {
+          let detail = 'Unable to send message';
+          try {
+            const err = await response.json();
+            if (err && (err.description || err.error)) detail = err.description || err.error;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+        return response.json();
+      }
+
+      function startPolling() {
+        if (pollTimer) return;
+        pollTimer = setInterval(fetchMessages, 10000);
+      }
+
+      function stopPolling() {
+        if (!pollTimer) return;
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+
+      function openDrawer() {
+        if (isOpen()) return;
+        if (closeTimer) {
+          clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+        drawer.dataset.open = 'true';
+        drawer.setAttribute('aria-hidden', 'false');
+        drawer.classList.remove('pointer-events-none');
+        drawer.classList.add('pointer-events-auto');
+        handle.setAttribute('aria-expanded', 'true');
+        if (edgeHandle) edgeHandle.classList.remove('hidden');
+        if (panel) {
+          panel.classList.remove('translate-x-full');
+          panel.classList.add('translate-x-0');
+        }
+        if (backdrop) {
+          backdrop.classList.remove('hidden');
+          requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
+        }
+        document.addEventListener('keydown', handleEscape);
+        focusTextarea();
+        fetchMessages({ announce: true }).then(markAllRead).catch(() => {});
+        startPolling();
+      }
+
+      function closeDrawer() {
+        if (!isOpen()) return;
+        drawer.dataset.open = 'false';
+        drawer.setAttribute('aria-hidden', 'true');
+        handle.setAttribute('aria-expanded', 'false');
+        if (edgeHandle) edgeHandle.classList.add('hidden');
+        if (panel) {
+          panel.classList.add('translate-x-full');
+          panel.classList.remove('translate-x-0');
+        }
+        if (backdrop) {
+          backdrop.classList.add('opacity-0');
+          const hide = () => backdrop.classList.add('hidden');
+          const timer = setTimeout(hide, 220);
+          backdrop.addEventListener('transitionend', () => {
+            clearTimeout(timer);
+            hide();
+          }, { once: true });
+        }
+        document.removeEventListener('keydown', handleEscape);
+        closeTimer = setTimeout(() => {
+          drawer.classList.add('pointer-events-none');
+          drawer.classList.remove('pointer-events-auto');
+          closeTimer = null;
+        }, 240);
+        updateBadge();
+      }
+
+      function handleEscape(event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeDrawer();
+        }
+      }
+
+      function toggleDrawer() {
+        if (isOpen()) closeDrawer();
+        else openDrawer();
+      }
+
+      handle.addEventListener('click', (event) => {
+        event.preventDefault();
+        toggleDrawer();
+      });
+
+      handle.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggleDrawer();
+        }
+      });
+
+      if (backdrop) backdrop.addEventListener('click', closeDrawer);
+      closeButtons.forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          closeDrawer();
+        });
+      });
+
+      if (form && textarea) {
+        setStatus('Online');
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const value = textarea.value ? textarea.value.trim() : '';
+          if (!value) {
+            setStatus('Enter a message');
+            focusTextarea();
+            return;
+          }
+          if (submitBtn) submitBtn.disabled = true;
+          setStatus('Sending...');
+          try {
+            await sendMessage(value);
+            textarea.value = '';
+            await fetchMessages({ announce: true });
+            focusTextarea();
+            markAllRead();
+            setStatus('Sent');
+            setTimeout(() => setStatus('Online'), 1200);
+          } catch (error) {
+            console.error('[chat] send error', error);
+            setStatus(error && error.message ? error.message : 'Unable to send');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        });
+
+        textarea.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
+          }
+        });
+      }
+
+      if (badge) badge.classList.add('hidden');
+      fetchMessages({ announce: true }).catch(() => {});
+      startPolling();
+    })();
+  </script>
+
+
+
+
 
   <script>
     // Account dropdown menu (unchanged)

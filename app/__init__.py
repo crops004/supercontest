@@ -55,6 +55,9 @@ def create_app():
     from app.api.routes import bp as api_bp
     app.register_blueprint(api_bp)
 
+    from app.chat import bp as chat_bp
+    app.register_blueprint(chat_bp)
+
     # ---------------- Footer context (used by base.html) ----------------
 
     def _resolve_footer_week():
@@ -116,6 +119,7 @@ def create_app():
                             "final_score_away": g.final_score_away,
                             "spread_home": g.spread_home,
                             "spread_away": g.spread_away,
+                            "completed": g.completed,
                         },
                     }
                 )

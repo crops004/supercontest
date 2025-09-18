@@ -19,6 +19,7 @@ class User(UserMixin,db.Model):
     notify_lines_posted   = db.Column(db.Boolean, default=True)
     notify_picks_reminder = db.Column(db.Boolean, default=True)
     notify_weekly_recap   = db.Column(db.Boolean, default=True)
+    chat_messages = db.relationship("ChatMessage", backref="user", lazy="dynamic", cascade="all, delete-orphan")
 
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)
@@ -100,6 +101,47 @@ class TeamGameATS(db.Model):
     __table_args__ = (
         db.UniqueConstraint('game_id', 'team', name='uq_team_game_once'),
     )
+
+
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc), onupdate=func.now())
+
+    __table_args__ = (
+        db.Index('ix_chat_messages_created_at', 'created_at'),
+    )
+
+    def to_dict(self):
+        user = getattr(self, 'user', None)
+        display_name = None
+        if user is not None:
+            display_name = getattr(user, 'display_full_name', None) or getattr(user, 'username', None)
+        return {
+            'id': self.id,
+            'user': {
+                'id': user.id if user else None,
+                'display_name': display_name or 'Member',
+            },
+            'body': self.body,
+            'created_at': self._iso_timestamp(self.created_at),
+            'updated_at': self._iso_timestamp(self.updated_at),
+        }
+
+    @staticmethod
+    def _iso_timestamp(dt):
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            from datetime import timezone as _tz
+            dt = dt.replace(tzinfo=_tz.utc)
+        return dt.isoformat().replace('+00:00', 'Z')
+
 
 class WeeklyEmailLog(db.Model):
     __tablename__ = "weekly_email_log"

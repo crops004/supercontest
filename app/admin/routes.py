@@ -370,6 +370,20 @@ def admin_scores_and_finalize_week():
     return redirect(url_for("admin.actions", week=week))
 
 
+@bp.post("/internal/cron/refresh-scores")
+def cron_refresh_scores():
+    token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
+    if not token or token != current_app.config.get("CRON_SECRET"):
+        abort(401)
+
+    days_from = request.args.get("days_from", type=int) or 3
+    try:
+        res = import_all_scores(days_from=days_from)
+        return jsonify({"ok": True, "days_from": days_from, **res}), 200
+    except Exception:
+        current_app.logger.exception("[cron refresh-scores] failed days_from=%s", days_from)
+        return jsonify({"ok": False, "error": "refresh_failed"}), 500
+    
 # ------------------------------------------------------------
 # ATS SUMMARY PAGE
 # ------------------------------------------------------------

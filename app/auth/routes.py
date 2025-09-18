@@ -4,6 +4,7 @@ from urllib.parse import urlparse, urljoin
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 import hashlib
+from sqlalchemy import func
 
 from app.extensions import db
 from app.models import User
@@ -159,13 +160,18 @@ def login():
         return redirect(url_for("standings.standings"))
 
     if request.method == 'POST':
-        username = request.form.get('username','').strip()
-        password = request.form.get('password','')
+        identifier = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
         remember = bool(request.form.get('remember'))
 
-        user = User.query.filter_by(username=username).first()
+        user = None
+        if identifier:
+            user = User.query.filter_by(username=identifier).first()
+            if not user:
+                user = User.query.filter(func.lower(User.email) == identifier.lower()).first()
+
         if not user or not user.check_password(password):
-            flash("Invalid username or password.", 'auth_error')
+            flash("Invalid username/email or password.", 'auth_error')
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=remember)
