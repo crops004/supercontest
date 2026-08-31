@@ -27,3 +27,4 @@ def _require_admin():
 from . import routes    # noqa: E402,F401  (hub, actions, lock/sync cron, ATS, picks matrix)
 from . import emails    # noqa: E402,F401  (email previews/sends + their cron endpoints)
 from . import db_admin  # noqa: E402,F401  (generic DB browser/editor)
+from . import seasons   # noqa: E402,F401  (create/switch seasons)

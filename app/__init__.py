@@ -7,6 +7,7 @@ from app.extensions import db, migrate, login_manager
 from app.filters import register_template_utils, abbr_team
 from app.models import Game, Pick  # TeamGameATS not needed for footer coloring
 from app.services.picks import remaining_picks_this_week
+from app.services.season import current_season_id
 import logging, sys
 import os
 
@@ -70,7 +71,7 @@ def create_app():
             return w
         row = (
             db.session.query(Game.week)
-            .filter(Game.spread_is_locked.is_(True))
+            .filter(Game.spread_is_locked.is_(True), Game.season_id == current_season_id())
             .order_by(Game.week.desc())
             .first()
         )
@@ -92,7 +93,7 @@ def create_app():
             rows = (
                 db.session.query(Pick, Game)
                 .join(Game, Pick.game_id == Game.id)
-                .filter(Pick.user_id == current_user.id, Game.week == week)
+                .filter(Pick.user_id == current_user.id, Game.week == week, Game.season_id == current_season_id())
                 .order_by(Game.kickoff_at.asc(), Game.id.asc())
                 .all()
             )

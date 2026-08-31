@@ -23,6 +23,7 @@ from app.services.week import current_week_number
 from app.services.ats import snapshot_closing_lines_for_game, finalize_ats_for_game
 from app.services.time_utils import day_key, time_key
 from app.services.picks import remaining_picks_this_week
+from app.services.season import current_season_id
 
 from . import bp  # use the blueprint from __init__.py
 
@@ -40,7 +41,13 @@ from . import bp  # use the blueprint from __init__.py
 def index():
     """Lightweight admin hub (collection page)."""
     # minimal context for lines preview only
-    week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
+    week_rows = (
+        db.session.query(Game.week)
+        .filter(Game.season_id == current_season_id())
+        .distinct()
+        .order_by(Game.week.asc())
+        .all()
+    )
     weeks: List[int] = [w for (w,) in week_rows] or [0]
     current_wk = current_week_number()
     selected_week = request.args.get("week", type=int)
@@ -59,7 +66,13 @@ def index():
 @login_required
 def actions():
     # ---- figure out which week to show, same logic you already had ----
-    week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
+    week_rows = (
+        db.session.query(Game.week)
+        .filter(Game.season_id == current_season_id())
+        .distinct()
+        .order_by(Game.week.asc())
+        .all()
+    )
     weeks: list[int] = [w for (w,) in week_rows] or [0]
     current_wk = current_week_number()
 
@@ -157,7 +170,7 @@ def _lock_and_snapshot_week(week: int, *, line_source: str) -> tuple[int, int]:
     Locks all games in `week` (if not already), then snapshots closing lines for all locked games in that week.
     Returns (locked_now_count, snap_count).
     """
-    games = Game.query.filter(Game.week == week).all()
+    games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
 
     locked_now = 0
     for g in games:
@@ -224,7 +237,7 @@ def cron_tuesday_lock_cycle():
     try:
         if dry_run:
             res = refresh_spreads_unlocked()  # reads/writes spreads for unlocked; allow this preview write?
-            games = Game.query.filter(Game.week == week).all()
+            games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
             would_lock = sum(1 for g in games if not getattr(g, "spread_is_locked", False))
             # We *won’t* actually flip locks or snapshot in dry_run: just report
             return jsonify({
@@ -260,7 +273,7 @@ def _finalize_week_ats(week: int, *, days_from: int = 3) -> dict:
     """
     res_scores = import_all_scores(days_from=days_from)
 
-    games = Game.query.filter(Game.week == week).all()
+    games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
     finalized = 0
     for g in games:
         if g.final_score_home is not None and g.final_score_away is not None:
@@ -305,7 +318,7 @@ def cron_finalize_ats():
         if dry_run:
             # Simulate score import only (don’t change DB state)
             res_scores = import_all_scores(days_from=days_from)
-            games = Game.query.filter(Game.week == week).all()
+            games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
             can_finalize = sum(
                 1 for g in games if g.final_score_home is not None and g.final_score_away is not None
             )
@@ -334,7 +347,7 @@ def admin_prep_week():
     if week is None:
         flash("No week specified.", "error")
         return redirect(url_for("admin.actions"))
-    games = Game.query.filter(Game.week == week).all()
+    games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
     locked_now = 0
     for g in games:
         if not getattr(g, "spread_is_locked", False):
@@ -358,7 +371,7 @@ def admin_scores_and_finalize_week():
         flash("No week specified.", "error")
         return redirect(url_for("admin.actions"))
     res_scores = import_all_scores(days_from=days_from)
-    games = Game.query.filter(Game.week == week).all()
+    games = Game.query.filter(Game.week == week, Game.season_id == current_season_id()).all()
     fin = 0
     for g in games:
         if g.final_score_home is not None and g.final_score_away is not None:
@@ -388,7 +401,13 @@ def cron_refresh_scores():
 @bp.get("/ats")
 @login_required
 def ats_summary():
-    week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
+    week_rows = (
+        db.session.query(Game.week)
+        .filter(Game.season_id == current_season_id())
+        .distinct()
+        .order_by(Game.week.asc())
+        .all()
+    )
     weeks: List[int] = [w for (w,) in week_rows] or [0]
     current_wk = current_week_number()
     selected_week = request.args.get("week", type=int)
@@ -411,6 +430,7 @@ def ats_summary():
             nocovs.label("nocovers"),
         )
         .join(Game, TeamGameATS.game_id == Game.id)
+        .filter(Game.season_id == current_season_id())
     )
     if ats_scope == "week":
         q = q.filter(Game.week == selected_week)
@@ -449,7 +469,13 @@ def ats_summary():
 @bp.get("/picks")
 @login_required
 def picks_matrix():
-    week_rows = db.session.query(Game.week).distinct().order_by(Game.week.asc()).all()
+    week_rows = (
+        db.session.query(Game.week)
+        .filter(Game.season_id == current_season_id())
+        .distinct()
+        .order_by(Game.week.asc())
+        .all()
+    )
     weeks: List[int] = [w for (w,) in week_rows] or [0]
     current_wk = current_week_number()
     selected_week = request.args.get("week", type=int)
@@ -462,7 +488,7 @@ def picks_matrix():
         db.session.query(Pick, User, Game)
         .join(Game, Pick.game_id == Game.id)
         .join(User, Pick.user_id == User.id)
-        .filter(Game.week == selected_week)
+        .filter(Game.week == selected_week, Game.season_id == current_season_id())
         .order_by(User.username.asc(), Game.kickoff_at.asc(), Game.id.asc())
         .all()
     )
@@ -505,7 +531,7 @@ def admin_lines_fragment():
 
         games = (
             Game.query
-            .filter(Game.week == week)
+            .filter(Game.week == week, Game.season_id == current_season_id())
             .order_by(Game.kickoff_at.asc(), Game.id.asc())
             .all()
         )

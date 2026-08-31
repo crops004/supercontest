@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from app.extensions import db
 from app.models import Pick, User, Game, TeamGameATS
 from app.scoring import points_for_pick
+from app.services.season import current_season_id
 from . import bp
 
 
@@ -19,13 +20,23 @@ FALLBACK_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 
 def get_current_week() -> int:
     """
-    Current week = max week having at least one game with kickoff <= now().
-    Falls back to earliest week if nothing has started yet.
+    Current week = max week having at least one game with kickoff <= now(),
+    scoped to the current season. Falls back to earliest week in the season
+    if nothing has started yet.
     """
-    kicked = db.session.query(func.max(Game.week)).filter(Game.kickoff_at <= func.now()).scalar()
+    season_id = current_season_id()
+    kicked = (
+        db.session.query(func.max(Game.week))
+        .filter(Game.season_id == season_id, Game.kickoff_at <= func.now())
+        .scalar()
+    )
     if kicked is not None:
         return int(kicked)
-    first_week = db.session.query(func.min(Game.week)).scalar()
+    first_week = (
+        db.session.query(func.min(Game.week))
+        .filter(Game.season_id == season_id)
+        .scalar()
+    )
     return int(first_week or 0)
 
 
@@ -68,9 +79,10 @@ def standings():
         return "pending"
 
     # --- determine display week / bounds ---
+    season_id = current_season_id()
     cur_week = get_current_week()
-    min_week = db.session.query(func.min(Game.week)).scalar() or 0
-    max_week = db.session.query(func.max(Game.week)).scalar() or 0
+    min_week = db.session.query(func.min(Game.week)).filter(Game.season_id == season_id).scalar() or 0
+    max_week = db.session.query(func.max(Game.week)).filter(Game.season_id == season_id).scalar() or 0
 
     mock_week = request.args.get("mock_week", type=int)
     if mock_week is not None:
@@ -116,7 +128,7 @@ def standings():
         return fn
 
     # --- data for this week ---
-    games_this_week: List[Game] = Game.query.filter_by(week=display_week).all()
+    games_this_week: List[Game] = Game.query.filter_by(week=display_week, season_id=season_id).all()
     game_ids_week = [g.id for g in games_this_week]
     ats_rows_week = TeamGameATS.query.filter(TeamGameATS.game_id.in_(game_ids_week)).all() if game_ids_week else []
     ats_by_game_week = {(r.game_id, r.team): (r.ats_result or None) for r in ats_rows_week}
@@ -124,7 +136,7 @@ def standings():
     picks_this_week = (
         db.session.query(Pick, Game)
         .join(Game, Pick.game_id == Game.id)
-        .filter(Game.week == display_week)
+        .filter(Game.week == display_week, Game.season_id == season_id)
         .all()
     )
     picks_by_user_this_week: Dict[int, List[Tuple[Pick, Game]]] = {}
@@ -135,7 +147,7 @@ def standings():
     picks_through_week = (
         db.session.query(Pick, Game)
         .join(Game, Pick.game_id == Game.id)
-        .filter(Game.week <= display_week)
+        .filter(Game.week <= display_week, Game.season_id == season_id)
         .all()
     )
     picks_by_user_to_date: Dict[int, List[Tuple[Pick, Game]]] = {}

@@ -8,6 +8,7 @@ from app.models import Game, Pick, TeamGameATS
 from app.services.time_utils import day_key, time_key
 from app.filters import abbr_team
 from app.services.week import current_week_number  # ✅ to compute default selected week
+from app.services.season import current_season_id
 
 from . import bp
 
@@ -108,9 +109,9 @@ def _resolve_ats_for_games(games, debug=False):
     return ats_resolved, dbg
 
 def _regular_weeks_list():
-    """All distinct regular-season weeks (>=1), ascending. Default [1] if empty."""
+    """All distinct regular-season weeks (>=1) in the current season, ascending. Default [1] if empty."""
     rows = (db.session.query(Game.week)
-            .filter(Game.week >= 1)
+            .filter(Game.week >= 1, Game.season_id == current_season_id())
             .distinct()
             .order_by(Game.week.asc())
             .all())
@@ -143,7 +144,7 @@ def weekly_lines():
 
     # Load ALL games for the selected week (✅ do NOT filter by locked)
     games = (Game.query
-             .filter(Game.week == selected_week)
+             .filter(Game.week == selected_week, Game.season_id == current_season_id())
              .order_by(Game.kickoff_at.asc(), Game.id.asc())
              .all())
 
@@ -162,7 +163,7 @@ def weekly_lines():
     if current_user.is_authenticated:
         picked = (db.session.query(Pick)
                   .join(Game, Game.id == Pick.game_id)
-                  .filter(Pick.user_id == current_user.id, Game.week == selected_week)
+                  .filter(Pick.user_id == current_user.id, Game.week == selected_week, Game.season_id == current_season_id())
                   .all())
         for p in picked:
             picks_by_game[p.game_id] = p.chosen_team
@@ -201,7 +202,7 @@ def weekly_lines_fragment():
 
     # Load ALL games for the selected week (✅ do NOT filter by locked)
     games = (Game.query
-             .filter(Game.week == selected_week)
+             .filter(Game.week == selected_week, Game.season_id == current_season_id())
              .order_by(Game.kickoff_at.asc(), Game.id.asc())
              .all())
 
@@ -217,7 +218,7 @@ def weekly_lines_fragment():
     if current_user.is_authenticated:
         picked = (db.session.query(Pick)
                   .join(Game, Game.id == Pick.game_id)
-                  .filter(Pick.user_id == current_user.id, Game.week == selected_week)
+                  .filter(Pick.user_id == current_user.id, Game.week == selected_week, Game.season_id == current_season_id())
                   .all())
         for p in picked:
             picks_by_game[p.game_id] = p.chosen_team
@@ -278,10 +279,12 @@ def submit_picks_api():
 
     now_utc = datetime.now(timezone.utc)
 
+    season_id = current_season_id()
+
     # Validate games belong to this week (if any provided)
     if parsed:
         game_ids = [gid for gid, _ in parsed]
-        games = Game.query.filter(Game.id.in_(game_ids), Game.week == week).all()
+        games = Game.query.filter(Game.id.in_(game_ids), Game.week == week, Game.season_id == season_id).all()
         lookup = {g.id: g for g in games}
         if len(lookup) != len(game_ids):
             return jsonify(ok=False, error="One or more picks not found for this week"), 400
@@ -293,6 +296,7 @@ def submit_picks_api():
                        .join(Game, Game.id == Pick.game_id)
                        .filter(Pick.user_id == current_user.id,
                                Game.week == week,
+                               Game.season_id == season_id,
                                Game.kickoff_at <= now_utc)
                        .count())
     remaining_slots = max(0, 5 - locked_existing)
@@ -311,7 +315,7 @@ def submit_picks_api():
 
     # Delete existing UNLOCKED picks for this week (0-new-picks => clear)
     subq_ids = (db.session.query(Game.id)
-                .filter(Game.week == week, Game.kickoff_at > now_utc)
+                .filter(Game.week == week, Game.season_id == season_id, Game.kickoff_at > now_utc)
                 .subquery())
     (db.session.query(Pick)
      .filter(Pick.user_id == current_user.id, Pick.game_id.in_(subq_ids))
@@ -330,7 +334,7 @@ def submit_picks_api():
     # Return DB truth (locked + newly saved)
     committed = (db.session.query(Pick, Game)
                  .join(Game, Pick.game_id == Game.id)
-                 .filter(Pick.user_id == current_user.id, Game.week == week)
+                 .filter(Pick.user_id == current_user.id, Game.week == week, Game.season_id == season_id)
                  .all())
     committed_picks = [
         {"game_id": g.id, "team": p.chosen_team, "abbr": abbr_team(p.chosen_team)}
@@ -370,10 +374,11 @@ def submit_picks():
         selections = selections[:5]
 
     now_utc = datetime.now(timezone.utc)
+    season_id = current_season_id()
 
     # Delete existing UNLOCKED picks for this week (also handles empty → clear)
     subq_game_ids = (db.session.query(Game.id)
-                     .filter(Game.week == week, Game.kickoff_at > now_utc)
+                     .filter(Game.week == week, Game.season_id == season_id, Game.kickoff_at > now_utc)
                      .subquery())
     (db.session.query(Pick)
      .filter(Pick.user_id == current_user.id, Pick.game_id.in_(subq_game_ids))
@@ -384,6 +389,7 @@ def submit_picks():
                        .join(Game, Game.id == Pick.game_id)
                        .filter(Pick.user_id == current_user.id,
                                Game.week == week,
+                               Game.season_id == season_id,
                                Game.kickoff_at <= now_utc)
                        .count())
     remaining_slots = max(0, 5 - locked_existing)
@@ -394,7 +400,7 @@ def submit_picks():
         if inserted >= remaining_slots:
             break
         g = Game.query.get(gid)
-        if not g or g.week != week or team not in (g.home_team, g.away_team) or not g.kickoff_at or g.kickoff_at <= now_utc:
+        if not g or g.week != week or g.season_id != season_id or team not in (g.home_team, g.away_team) or not g.kickoff_at or g.kickoff_at <= now_utc:
             continue
         p = Pick()
         p.user_id = current_user.id
