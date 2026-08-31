@@ -48,12 +48,12 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_weekly_email_recipient_log_email'), ['email'], unique=False)
         batch_op.create_index(batch_op.f('ix_weekly_email_recipient_log_log_id'), ['log_id'], unique=False)
 
-    with op.batch_alter_table('game', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_game_week'))
-
-    with op.batch_alter_table('pick', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_pick_game'))
-        batch_op.drop_index(batch_op.f('ix_pick_user'))
+    # These indexes were created out-of-band on some databases (not by any
+    # tracked migration), so guard the drops for environments where they
+    # were never created in the first place.
+    op.execute("DROP INDEX IF EXISTS ix_game_week")
+    op.execute("DROP INDEX IF EXISTS ix_pick_game")
+    op.execute("DROP INDEX IF EXISTS ix_pick_user")
 
     # ### end Alembic commands ###
 
