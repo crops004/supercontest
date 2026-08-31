@@ -326,6 +326,7 @@ def submit_picks_api():
         p = Pick()
         p.user_id = current_user.id
         p.game_id = gid
+        p.season_id = season_id
         p.chosen_team = team
         db.session.add(p)
 
@@ -405,6 +406,7 @@ def submit_picks():
         p = Pick()
         p.user_id = current_user.id
         p.game_id = gid
+        p.season_id = season_id
         p.chosen_team = team
         db.session.add(p)
         inserted += 1

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -8,9 +8,9 @@ from app.services.week import week_for_kickoff, current_week_number
 DENVER = ZoneInfo("America/Denver")
 
 
-def _set_week1(monkeypatch, anchor=datetime(2025, 9, 2, 0, 0, tzinfo=DENVER)):
+def _set_week1(monkeypatch, start_date=date(2025, 9, 2)):
     """Stub out get_current_season() so week.py doesn't need a real DB/app context."""
-    fake_season = SimpleNamespace(week1_anchor=anchor)
+    fake_season = SimpleNamespace(start_date=start_date, year=2025)
     monkeypatch.setattr(week_module, "get_current_season", lambda: fake_season)
 
 
@@ -52,6 +52,14 @@ def test_current_week_number_uses_given_now(monkeypatch):
 
 def test_uses_a_different_seasons_own_anchor(monkeypatch):
     # A later season's anchor shifts week numbering independently of 2025's.
-    _set_week1(monkeypatch, anchor=datetime(2026, 9, 1, 0, 0, tzinfo=DENVER))
-    kickoff = datetime(2026, 9, 6, 18, 0, tzinfo=DENVER)  # 5 days after 2026's start
+    _set_week1(monkeypatch, start_date=date(2026, 9, 8))
+    kickoff = datetime(2026, 9, 13, 18, 0, tzinfo=DENVER)  # 5 days after 2026's start
     assert week_for_kickoff(kickoff) == 1
+
+
+def test_missing_start_date_raises(monkeypatch):
+    import pytest
+    fake_season = SimpleNamespace(start_date=None, year=2026)
+    monkeypatch.setattr(week_module, "get_current_season", lambda: fake_season)
+    with pytest.raises(RuntimeError):
+        week_for_kickoff(datetime(2026, 9, 13, 18, 0, tzinfo=DENVER))

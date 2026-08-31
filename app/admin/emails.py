@@ -270,10 +270,12 @@ def cron_weekly_email():
         return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
 
     subject = f"Week {week} NFL Spreads"
+    season_id = current_season_id()
 
-    # Acquire lock row via unique(week)
+    # Acquire lock row via unique(season_id, week, kind)
     try:
         lock = WeeklyEmailLog()          # ✅ no kwargs
+        lock.season_id = season_id
         lock.week = week
         lock.subject = subject
         lock.status = "started"
@@ -282,10 +284,11 @@ def cron_weekly_email():
         acquired = True
     except IntegrityError:
         db.session.rollback()
-        existing = WeeklyEmailLog.query.filter_by(week=week).first()
+        existing = WeeklyEmailLog.query.filter_by(week=week, season_id=season_id).first()
         if existing is None:
             # extremely rare: race; create a fresh row
             lock = WeeklyEmailLog()
+            lock.season_id = season_id
             lock.week = week
             lock.subject = subject
             lock.status = "started"
@@ -641,10 +644,12 @@ def _send_picks_reminder_to_incomplete(week: int, log_row: WeeklyEmailLog) -> tu
 def send_picks_reminder_manual():
     week = request.args.get("week", type=int) or request.form.get("week", type=int) or current_week_number()
     resend = str(request.args.get("resend") or request.form.get("resend") or "").strip().lower() in ("1","true","yes","y","on")
+    season_id = current_season_id()
 
-    # Acquire a (week, kind='reminder') lock in weekly_email_log
+    # Acquire a (season_id, week, kind='reminder') lock in weekly_email_log
     try:
         lock = WeeklyEmailLog()
+        lock.season_id = season_id
         lock.week = week
         lock.kind = "reminder"
         lock.subject = f"Reminder: finish your Week {week} picks"
@@ -653,9 +658,9 @@ def send_picks_reminder_manual():
         db.session.commit()
         acquired = True
     except IntegrityError:
-        # A log row already exists for (week, reminder)
+        # A log row already exists for (season_id, week, reminder)
         db.session.rollback()
-        existing = WeeklyEmailLog.query.filter_by(week=week, kind="reminder").first()
+        existing = WeeklyEmailLog.query.filter_by(week=week, kind="reminder", season_id=season_id).first()
 
         if not existing:
             flash("Existing reminder log not found; please try again.", "error")
@@ -704,6 +709,7 @@ def cron_picks_reminder():
 
     try:
         lock = WeeklyEmailLog()
+        lock.season_id = current_season_id()
         lock.week = week
         lock.kind = "reminder"
         lock.subject = f"Reminder: finish your Week {week} picks"
@@ -712,7 +718,7 @@ def cron_picks_reminder():
         acquired = True
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"ok": True, "skipped": True, "reason": "already sent (week,kind)"}), 200
+        return jsonify({"ok": True, "skipped": True, "reason": "already sent (season,week,kind)"}), 200
 
     try:
         sent, total, failed = _send_picks_reminder_to_incomplete(week, lock)

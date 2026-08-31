@@ -37,14 +37,23 @@ class User(UserMixin,db.Model):
 class Season(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     year = db.Column(db.Integer, unique=True, nullable=False)
-    week1_anchor = db.Column(db.DateTime(timezone=True), nullable=False)
-    is_current = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    name = db.Column(db.Text)
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+    is_active = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
 
     games = db.relationship("Game", backref="season", lazy="dynamic")
 
+    __table_args__ = (
+        # At most one season can be active at a time (DB-enforced).
+        db.Index('uq_season_one_active', 'is_active', unique=True,
+                 postgresql_where=db.text('is_active')),
+    )
+
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False, index=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     week = db.Column(db.Integer, nullable=False)
     home_team = db.Column(db.String(50), nullable=False)
     away_team = db.Column(db.String(50), nullable=False)
@@ -53,15 +62,23 @@ class Game(db.Model):
     spread_home = db.Column(db.Numeric, nullable=True)
     spread_away = db.Column(db.Numeric, nullable=True)
     spread_last_update = db.Column(db.DateTime(timezone=True), nullable=True)
-    odds_event_id = db.Column(db.Text, unique=True, index=True, nullable=True)
+    odds_event_id = db.Column(db.Text, nullable=True)
     kickoff_at = db.Column(db.DateTime(timezone=True), nullable=True)
     spread_is_locked = db.Column(db.Boolean, default=False)
     spread_locked_at = db.Column(db.DateTime(timezone=True), nullable=True)
     completed = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
-    
+
+    __table_args__ = (
+        # Lets Pick/TeamGameATS take a composite FK to (game.id, game.season_id),
+        # so a pick can never reference a game from a different season.
+        db.UniqueConstraint('id', 'season_id', name='uq_game_id_season'),
+        db.UniqueConstraint('season_id', 'odds_event_id', name='uq_game_season_odds_event_id'),
+        db.Index('idx_game_season_week', 'season_id', 'week'),
+    )
+
     def has_started(self):
         return datetime.now(timezone.utc) >= self.kickoff_at  # <- aware compare
-    
+
     @property
     def has_final_score(self):
         return self.final_score_home is not None and self.final_score_away is not None
@@ -70,15 +87,20 @@ class Pick(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     chosen_team = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships (optional)
     user = db.relationship('User', backref='picks', lazy=True)
-    game = db.relationship('Game', backref='picks', lazy=True)
+    game = db.relationship('Game', backref='picks', lazy=True, foreign_keys=[game_id])
 
     __table_args__ = (
         db.UniqueConstraint('user_id', 'game_id', name='unique_user_game_pick'),
+        # A pick's season must match the season of the game it references.
+        db.ForeignKeyConstraint(['game_id', 'season_id'], ['game.id', 'game.season_id'], name='fk_pick_game_season'),
+        db.Index('idx_pick_season_game', 'season_id', 'game_id'),
+        db.Index('idx_pick_season_user', 'season_id', 'user_id'),
     )
 
 ATSResultEnum = Enum('COVER', 'NO_COVER', 'PUSH', name='ats_result_enum')
@@ -88,6 +110,7 @@ class TeamGameATS(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), index=True, nullable=False)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
 
     # who we’re describing
     team = db.Column(db.String, nullable=False)
@@ -108,7 +131,9 @@ class TeamGameATS(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())
 
     __table_args__ = (
-        db.UniqueConstraint('game_id', 'team', name='uq_team_game_once'),
+        db.UniqueConstraint('season_id', 'game_id', 'team', name='uq_season_game_team_once'),
+        db.ForeignKeyConstraint(['game_id', 'season_id'], ['game.id', 'game.season_id'], name='fk_tga_game_season'),
+        db.Index('idx_tga_season_team', 'season_id', 'team'),
     )
 
 
@@ -156,6 +181,7 @@ class WeeklyEmailLog(db.Model):
     __tablename__ = "weekly_email_log"
 
     id         = db.Column(db.Integer, primary_key=True)
+    season_id  = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False)
     week       = db.Column(db.Integer, nullable=False, index=True)
     kind       = db.Column(db.String(32), nullable=False, default="weekly", server_default="weekly")
     subject    = db.Column(db.String(255), nullable=False)
@@ -174,7 +200,9 @@ class WeeklyEmailLog(db.Model):
     )
 
     __table_args__ = (
-        db.UniqueConstraint("week", "kind", name="uq_week_kind"),
+        # Week numbers reset each season, so uniqueness must include season_id.
+        db.UniqueConstraint("season_id", "week", "kind", name="uq_season_week_kind"),
+        db.Index('idx_email_log_season_week', 'season_id', 'week'),
     )
 
 
@@ -190,4 +218,26 @@ class WeeklyEmailRecipientLog(db.Model):
 
     __table_args__ = (
         db.Index("ix_recipient_log_logid_email", "log_id", "email"),
+    )
+
+
+class UserSeason(db.Model):
+    """
+    Per-season entry-fee tracking (mapped to an existing table from an earlier,
+    not-yet-wired-in attempt at this feature). Not used by any app logic yet -
+    User.entry_paid is still the flat, current-season source of truth. Mapped
+    here so Alembic autogenerate doesn't mistake this table for something to
+    drop.
+    """
+    __tablename__ = "user_season"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id', ondelete='CASCADE'), nullable=False)
+    entry_paid = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'season_id', name='uq_user_season'),
     )

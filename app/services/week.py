@@ -1,6 +1,6 @@
 # app/services/week.py
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, time
 import zoneinfo
 from app.services.odds_client import parse_iso_z
 from app.services.season import get_current_season
@@ -10,12 +10,15 @@ DENVER = zoneinfo.ZoneInfo("America/Denver")
 # --- config ---
 def _week1_start_dt() -> datetime:
     """
-    The current season's week-1 anchor (Denver-local), e.g. 2025-09-02 00:00
-    America/Denver. Sourced from the Season row flagged is_current=True
-    (Season.week1_anchor), rather than a global env var, so each season can
+    The current season's week-1 anchor (Denver-local midnight on
+    Season.start_date), e.g. 2025-09-02 00:00 America/Denver. Sourced from
+    the active Season row rather than a global env var, so each season can
     have its own start date.
     """
-    return get_current_season().week1_anchor.astimezone(DENVER)
+    season = get_current_season()
+    if season.start_date is None:
+        raise RuntimeError(f"Season {season.year} has no start_date set.")
+    return datetime.combine(season.start_date, time.min, tzinfo=DENVER)
 
 # --- public API ---
 def week_for_kickoff(commence_time: str | datetime) -> int:

@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 from app import db
 from app.models import Game, TeamGameATS
 
-def _get_or_create_row(game_id: int, team: Optional[str]) -> TeamGameATS:
+def _get_or_create_row(game_id: int, season_id: int, team: Optional[str]) -> TeamGameATS:
     """Fetch the TeamGameATS row for (game_id, team), or create a new one."""
     team_str = team or ""  # avoid None for strict type checkers
 
@@ -12,6 +12,7 @@ def _get_or_create_row(game_id: int, team: Optional[str]) -> TeamGameATS:
         # Create empty and set attributes explicitly (pylance-friendly)
         row = TeamGameATS()  # type: ignore[call-arg]
         row.game_id = game_id
+        row.season_id = season_id
         row.team = team_str
         row.opponent = ""
         row.is_home = False
@@ -25,14 +26,14 @@ def snapshot_closing_lines_for_game(game: Game, line_source: Optional[str] = Non
     Snapshots closing spreads for both teams.
     """
     # HOME
-    home = _get_or_create_row(game.id, game.home_team)
+    home = _get_or_create_row(game.id, game.season_id, game.home_team)
     home.opponent = game.away_team or ""
     home.is_home = True
     home.closing_spread = Decimal(str(game.spread_home or 0))
     home.line_source = line_source
 
     # AWAY
-    away = _get_or_create_row(game.id, game.away_team)
+    away = _get_or_create_row(game.id, game.season_id, game.away_team)
     away.opponent = game.home_team or ""
     away.is_home = False
     away.closing_spread = Decimal(str(game.spread_away or 0))
@@ -59,7 +60,7 @@ def finalize_ats_for_game(game: Game) -> None:
         return
 
     # HOME
-    home = _get_or_create_row(game.id, game.home_team)
+    home = _get_or_create_row(game.id, game.season_id, game.home_team)
     home.opponent = game.away_team or ""
     home.is_home = True
     home.points_for = int(game.final_score_home)
@@ -69,7 +70,7 @@ def finalize_ats_for_game(game: Game) -> None:
     home.ats_result, home.cover_margin = _compute_ats(home.points_for, home.points_against, home.closing_spread)
 
     # AWAY
-    away = _get_or_create_row(game.id, game.away_team)
+    away = _get_or_create_row(game.id, game.season_id, game.away_team)
     away.opponent = game.home_team or ""
     away.is_home = False
     away.points_for = int(game.final_score_away)
