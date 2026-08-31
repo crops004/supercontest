@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Seasons{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[800px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Seasons</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <div class="rounded-xl border border-border bg-foreground p-4 mb-6">
+    <h2 class="text-lg font-semibold mb-3">Existing seasons</h2>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-copy-light border-b border-border">
+          <th class="py-2 pr-4">Year</th>
+          <th class="py-2 pr-4">Week 1 start (Denver)</th>
+          <th class="py-2 pr-4">Current?</th>
+          <th class="py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in seasons %}
+        <tr class="border-b border-border/50">
+          <td class="py-2 pr-4">{{ s.year }}</td>
+          <td class="py-2 pr-4">{{ s.week1_anchor.strftime('%Y-%m-%d') }}</td>
+          <td class="py-2 pr-4">
+            {% if s.is_current %}
+              <span class="px-2 py-0.5 rounded bg-primary text-primary-content text-xs">Current</span>
+            {% endif %}
+          </td>
+          <td class="py-2">
+            {% if not s.is_current %}
+            <form method="post" action="{{ url_for('admin.make_season_current', season_id=s.id) }}"
+                  onsubmit="return confirm('Make {{ s.year }} the current season? This affects the live site immediately.');">
+              <button class="text-xs px-2 py-1 rounded border border-border hover:opacity-90">Make current</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="rounded-xl border border-border bg-foreground p-4">
+    <h2 class="text-lg font-semibold mb-3">Start a new season</h2>
+    <form method="post" action="{{ url_for('admin.create_season') }}"
+          onsubmit="return confirm('Create this season and make it current? This immediately switches the live site to it.');"
+          class="flex flex-wrap items-end gap-3">
+      <label class="flex flex-col gap-1">
+        <span class="text-copy-light text-sm">Year</span>
+        <input type="number" name="year" required class="border border-border rounded px-2 py-1 bg-background text-copy w-28">
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-copy-light text-sm">Week 1 start date (Denver time)</span>
+        <input type="date" name="week1_date" required class="border border-border rounded px-2 py-1 bg-background text-copy">
+      </label>
+      <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+        Create &amp; make current
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

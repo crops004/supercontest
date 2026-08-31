@@ -1,13 +1,17 @@
 from datetime import datetime
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+import app.services.week as week_module
 from app.services.week import week_for_kickoff, current_week_number
 
 DENVER = ZoneInfo("America/Denver")
 
 
-def _set_week1(monkeypatch):
-    monkeypatch.setenv("NFL_WEEK1_TUESDAY", "2025-09-02")
+def _set_week1(monkeypatch, anchor=datetime(2025, 9, 2, 0, 0, tzinfo=DENVER)):
+    """Stub out get_current_season() so week.py doesn't need a real DB/app context."""
+    fake_season = SimpleNamespace(week1_anchor=anchor)
+    monkeypatch.setattr(week_module, "get_current_season", lambda: fake_season)
 
 
 def test_kickoff_before_week1_start_clamps_to_week1(monkeypatch):
@@ -44,3 +48,10 @@ def test_current_week_number_uses_given_now(monkeypatch):
     _set_week1(monkeypatch)
     now = datetime(2025, 9, 16, 12, 0, tzinfo=DENVER)
     assert current_week_number(now) == 3
+
+
+def test_uses_a_different_seasons_own_anchor(monkeypatch):
+    # A later season's anchor shifts week numbering independently of 2025's.
+    _set_week1(monkeypatch, anchor=datetime(2026, 9, 1, 0, 0, tzinfo=DENVER))
+    kickoff = datetime(2026, 9, 6, 18, 0, tzinfo=DENVER)  # 5 days after 2026's start
+    assert week_for_kickoff(kickoff) == 1

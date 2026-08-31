@@ -6,6 +6,7 @@ from app.extensions import db
 from app.models import Game
 from app.services.odds_client import parse_iso_z, fetch_odds, fetch_scores
 from app.services.week import week_for_kickoff, current_week_number
+from app.services.season import current_season_id
 from datetime import datetime, timezone
 
 
@@ -61,6 +62,7 @@ def upsert_game_from_odds_event(event: Dict[str, Any], *, force_week: Optional[i
     if is_new:
         game = Game()
         game.odds_event_id = ext_id
+        game.season_id = current_season_id()
 
     # Always sync identity/kickoff; these are safe even when locked.
     game.home_team = home

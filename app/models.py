@@ -34,8 +34,17 @@ class User(UserMixin,db.Model):
             return (" ".join(p for p in [self.first_name, self.last_name] if p)).strip()
         return self.username
 
+class Season(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    year = db.Column(db.Integer, unique=True, nullable=False)
+    week1_anchor = db.Column(db.DateTime(timezone=True), nullable=False)
+    is_current = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+
+    games = db.relationship("Game", backref="season", lazy="dynamic")
+
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.Integer, db.ForeignKey('season.id'), nullable=False, index=True)
     week = db.Column(db.Integer, nullable=False)
     home_team = db.Column(db.String(50), nullable=False)
     away_team = db.Column(db.String(50), nullable=False)

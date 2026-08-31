@@ -4,6 +4,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import Game
 from app.services.picks import remaining_picks_this_week
+from app.services.season import current_season_id
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -54,10 +55,14 @@ def picks_status():
 
 def _current_contest_week() -> int | None:
     """
-    Current week = max(Game.week) where kickoff <= now().
-    Returns None if no games exist.
+    Current week = max(Game.week) where kickoff <= now(), scoped to the
+    current season. Returns None if no games exist yet this season.
     """
-    wk = db.session.query(func.max(Game.week)).filter(Game.kickoff_at <= func.now()).scalar()
+    wk = (
+        db.session.query(func.max(Game.week))
+        .filter(Game.kickoff_at <= func.now(), Game.season_id == current_season_id())
+        .scalar()
+    )
     return int(wk) if wk is not None else None
 
 @bp.get("/billing/status")

@@ -39,9 +39,6 @@ class BaseConfig:
     DEFAULT_BOOKMAKER_KEY = os.environ.get("DEFAULT_BOOKMAKER_KEY", "draftkings")
     ODDS_TIMEOUT_SECONDS = int(os.environ.get("ODDS_TIMEOUT_SECONDS", 20))
 
-    # Optional: example of reading your custom timestamp if you need it in code
-    NFL_WEEK1_THURSDAY_UTC = os.environ.get("NFL_WEEK1_THURSDAY_UTC")
-    
     # NFL sport keys (used by lock/refresh code)
     SPORT_KEYS = {
         "regular": "americanfootball_nfl",

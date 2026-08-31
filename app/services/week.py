@@ -1,19 +1,21 @@
 # app/services/week.py
 from __future__ import annotations
-from datetime import datetime, date, time
-import os, zoneinfo
+from datetime import datetime
+import zoneinfo
 from app.services.odds_client import parse_iso_z
+from app.services.season import get_current_season
 
 DENVER = zoneinfo.ZoneInfo("America/Denver")
 
 # --- config ---
-def week1_tuesday_date() -> date:
-    """Return NFL Week 1 Tuesday as a date. Default 2025-09-02 if no env set."""
-    s = os.getenv("NFL_WEEK1_TUESDAY", "2025-09-02")
-    return date.fromisoformat(s)
-
 def _week1_start_dt() -> datetime:
-    return datetime.combine(week1_tuesday_date(), time.min, tzinfo=DENVER)
+    """
+    The current season's week-1 anchor (Denver-local), e.g. 2025-09-02 00:00
+    America/Denver. Sourced from the Season row flagged is_current=True
+    (Season.week1_anchor), rather than a global env var, so each season can
+    have its own start date.
+    """
+    return get_current_season().week1_anchor.astimezone(DENVER)
 
 # --- public API ---
 def week_for_kickoff(commence_time: str | datetime) -> int:

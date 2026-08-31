@@ -17,6 +17,7 @@ from app.scoring import points_for_pick
 from app.filters import team_short
 from app.emailer import send_email
 from app.services.week import current_week_number
+from app.services.season import current_season_id
 from app.services.time_utils import day_key, time_key
 from app.services.picks import remaining_picks_this_week
 
@@ -34,7 +35,7 @@ def build_weekly_spreads_context(week: int,
                                  weekly_lines_url: str | None = None) -> dict:
     games = (
         db.session.query(Game)
-        .filter(Game.week == week)
+        .filter(Game.week == week, Game.season_id == current_season_id())
         .order_by(Game.kickoff_at.asc(), Game.id.asc())
         .all()
     )
@@ -63,7 +64,11 @@ def build_weekly_spreads_context(week: int,
 @bp.get("/email/previews")
 @login_required
 def email_previews():
-    row = db.session.query(func.min(Game.week), func.max(Game.week)).first()
+    row = (
+        db.session.query(func.min(Game.week), func.max(Game.week))
+        .filter(Game.season_id == current_season_id())
+        .first()
+    )
 
     min_raw = row[0] if row else None
     max_raw = row[1] if row else None
@@ -431,11 +436,13 @@ def _build_standings_rows_for_email(prev_week: int):
             return f"{fn} {li}."
         return fn
 
+    season_id = current_season_id()
+
     # ---------- weekly picks for prev_week ----------
     pairs_week = (
         db.session.query(Pick, Game)
         .join(Game, Pick.game_id == Game.id)
-        .filter(Game.week == prev_week)
+        .filter(Game.week == prev_week, Game.season_id == season_id)
         .all()
     )
     by_user_week: Dict[int, List[Tuple[Pick, Game]]] = {}
@@ -450,7 +457,7 @@ def _build_standings_rows_for_email(prev_week: int):
     pairs_to_date = (
         db.session.query(Pick, Game)
         .join(Game, Pick.game_id == Game.id)
-        .filter(Game.week <= prev_week)
+        .filter(Game.week <= prev_week, Game.season_id == season_id)
         .all()
     )
     by_user_to_date: Dict[int, List[Tuple[Pick, Game]]] = {}
