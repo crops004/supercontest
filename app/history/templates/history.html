@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+
+<div class="max-w-[1100px] mx-auto p-4 text-copy">
+
+  {% if not has_seasons %}
+    <h1 class="text-xl font-semibold mb-2">History</h1>
+    <p class="text-copy-light">No completed seasons yet — check back once this season wraps up.</p>
+  {% else %}
+
+  <!-- Header with year arrows -->
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      {% if show_left %}
+        <a class="inline-block px-2 py-1 rounded-md border border-border bg-background hover:bg-foreground"
+           href="{{ url_for('history.history', year=prev_year) }}"
+           aria-label="Previous year">←</a>
+      {% endif %}
+
+      <strong class="text-[1.1rem]">{{ selected_year }} Season</strong>
+
+      {% if show_right %}
+        <a class="inline-block px-2 py-1 rounded-md border border-border bg-background hover:bg-foreground"
+           href="{{ url_for('history.history', year=next_year) }}"
+           aria-label="Next year">→</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Winner / Last place -->
+  <div class="grid grid-cols-2 gap-3 mb-4">
+    <div class="rounded-xl border border-border bg-foreground p-4 text-center">
+      <div class="text-2xl mb-1">🏆</div>
+      <div class="text-xs text-copy-lighter uppercase tracking-wide mb-1">Champion</div>
+      {% if winner %}
+        <div class="font-bold">{{ winner.display_name }}</div>
+        <div class="text-sm text-copy-light">{{ "%.1f"|format(winner.points) }} pts &middot; {{ winner.w }}-{{ winner.l }}-{{ winner.p }}</div>
+      {% else %}
+        <div class="text-copy-lighter text-sm">—</div>
+      {% endif %}
+    </div>
+    <div class="rounded-xl border border-border bg-foreground p-4 text-center">
+      <div class="text-2xl mb-1">🥴</div>
+      <div class="text-xs text-copy-lighter uppercase tracking-wide mb-1">Last Place</div>
+      {% if last_place %}
+        <div class="font-bold">{{ last_place.display_name }}</div>
+        <div class="text-sm text-copy-light">{{ "%.1f"|format(last_place.points) }} pts &middot; {{ last_place.w }}-{{ last_place.l }}-{{ last_place.p }}</div>
+      {% else %}
+        <div class="text-copy-lighter text-sm">—</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Season trend chart -->
+  <div class="rounded-xl border border-border bg-foreground p-4 mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <h2 class="text-sm font-semibold text-copy-light">Points by week</h2>
+      <div class="flex items-center gap-2">
+        <div class="flex rounded-lg border border-border overflow-hidden text-xs" role="group" aria-label="Week range">
+          <button type="button" data-trend-range="full"
+                  class="px-2.5 py-1 bg-primary text-primary-content" aria-pressed="true">Full Season</button>
+          <button type="button" data-trend-range="8"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Last 8</button>
+          <button type="button" data-trend-range="4"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Last 4</button>
+        </div>
+        <div class="flex rounded-lg border border-border overflow-hidden text-xs" role="group" aria-label="Chart view">
+          <button type="button" data-trend-mode="all"
+                  class="px-2.5 py-1 bg-primary text-primary-content" aria-pressed="true">All</button>
+          <button type="button" data-trend-mode="top"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Top 5</button>
+        </div>
+      </div>
+    </div>
+    <div class="relative h-56 md:h-72">
+      <canvas id="trend-chart" data-current-user-id="{{ current_user.id if current_user.is_authenticated else '' }}"
+              aria-label="Cumulative points by week for each player" role="img"></canvas>
+    </div>
+    <div id="trend-legend" class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs"></div>
+    <p class="text-xs text-copy-lighter mt-2 hidden md:block">Hover or tap a row in the table below to highlight that player's line.</p>
+    <p class="text-xs text-copy-lighter mt-2 md:hidden">Tap a row below to highlight that player's line.</p>
+  </div>
+
+  <!-- Final standings -->
+  <div class="overflow-x-auto border border-border rounded-xl bg-foreground">
+    <table class="w-full border-collapse text-sm text-copy">
+      <thead class="bg-background text-copy font-semibold">
+        <tr class="border-b border-border text-left">
+          <th class="px-4 py-3">#</th>
+          <th class="px-4 py-3">Player</th>
+          <th class="px-4 py-3 text-center">W</th>
+          <th class="px-4 py-3 text-center">L</th>
+          <th class="px-4 py-3 text-center">P</th>
+          <th class="px-4 py-3 text-right">Pts</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {% for r in rows %}
+        <tr class="hover:bg-background" data-user-row="{{ r.user_id }}">
+          <td class="px-4 py-3 text-copy-lighter">{{ r.rank }}</td>
+          <td class="px-4 py-3 font-bold">{{ r.display_name }}</td>
+          <td class="px-4 py-3 text-center font-semibold">{{ r.w }}</td>
+          <td class="px-4 py-3 text-center font-semibold">{{ r.l }}</td>
+          <td class="px-4 py-3 text-center font-semibold">{{ r.p }}</td>
+          <td class="px-4 py-3 text-right font-bold">{{ "%.1f"|format(r.points) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script type="application/json" id="trend-data">{{ trend | tojson }}</script>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% if has_seasons %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/trend-chart.js') }}"></script>
+{% endif %}
+{% endblock %}

@@ -41,6 +41,9 @@ class Season(db.Model):
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     is_active = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    # Regular season is weeks 1-18; week 19 is a tiebreaker-only week that
+    # should count toward standings/history only when explicitly enabled here.
+    uses_week19 = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
 
     games = db.relationship("Game", backref="season", lazy="dynamic")

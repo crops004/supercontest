@@ -1,5 +1,5 @@
 # app/__init__.py
-from flask import Flask, request, current_app, url_for
+from flask import Flask, request, current_app, url_for, render_template
 from flask_login import current_user
 from config import get_config
 from datetime import datetime, timezone
@@ -58,6 +58,9 @@ def create_app():
 
     from app.chat import bp as chat_bp
     app.register_blueprint(chat_bp)
+
+    from app.history import bp as history_bp
+    app.register_blueprint(history_bp)
 
     # ---------------- Footer context (used by base.html) ----------------
 
@@ -177,5 +180,9 @@ def create_app():
     @app.get("/healthz")
     def healthz():
         return "ok", 200
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template("404.html"), 404
 
     return app

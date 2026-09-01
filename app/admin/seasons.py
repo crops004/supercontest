@@ -7,7 +7,8 @@ from flask import request, render_template, redirect, url_for, flash
 from flask_login import login_required
 
 from app.extensions import db
-from app.models import Season
+from app.models import Season, Game, Pick
+from app.services.standings_trend import REGULAR_SEASON_WEEKS
 
 from . import bp
 
@@ -16,7 +17,29 @@ from . import bp
 @login_required
 def seasons():
     rows = Season.query.order_by(Season.year.desc()).all()
-    return render_template("seasons.html", seasons=rows)
+
+    week19_pick_counts = {}
+    for s in rows:
+        count = (
+            db.session.query(Pick.id)
+            .join(Game, Pick.game_id == Game.id)
+            .filter(Game.season_id == s.id, Game.week > REGULAR_SEASON_WEEKS)
+            .count()
+        )
+        week19_pick_counts[s.id] = count
+
+    return render_template("seasons.html", seasons=rows, week19_pick_counts=week19_pick_counts)
+
+
+@bp.post("/seasons/<int:season_id>/toggle-week19")
+@login_required
+def toggle_season_week19(season_id):
+    season = Season.query.get_or_404(season_id)
+    season.uses_week19 = not season.uses_week19
+    db.session.commit()
+    state = "now counts" if season.uses_week19 else "no longer counts"
+    flash(f"Week 19 {state} toward standings/history for {season.year}.", "success")
+    return redirect(url_for("admin.seasons"))
 
 
 @bp.post("/seasons")

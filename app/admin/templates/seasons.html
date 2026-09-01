@@ -17,6 +17,7 @@
           <th class="py-2 pr-4">Name</th>
           <th class="py-2 pr-4">Start date</th>
           <th class="py-2 pr-4">Active?</th>
+          <th class="py-2 pr-4">Week 19 (tiebreaker)</th>
           <th class="py-2"></th>
         </tr>
       </thead>
@@ -39,6 +40,19 @@
             {% if s.is_active %}
               <span class="px-2 py-0.5 rounded bg-primary text-primary-content text-xs">Active</span>
             {% endif %}
+          </td>
+          <td class="py-2 pr-4">
+            <form method="post" action="{{ url_for('admin.toggle_season_week19', season_id=s.id) }}"
+                  class="flex items-center gap-2">
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" onchange="this.form.requestSubmit()"
+                       {{ 'checked' if s.uses_week19 else '' }}
+                       class="h-4 w-4 rounded border-border bg-background accent-primary">
+                <span class="text-xs text-copy-lighter">
+                  {{ week19_pick_counts.get(s.id, 0) }} pick{{ 's' if week19_pick_counts.get(s.id, 0) != 1 else '' }}
+                </span>
+              </label>
+            </form>
           </td>
           <td class="py-2">
             {% if not s.is_active %}
