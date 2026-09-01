@@ -365,6 +365,10 @@ function bindTeamPopoverDelegationOnce() {
       }
     });
   }
+
+  // Scrolling doesn't fire a 'click' event on mobile even though it starts
+  // with a touch, so it never hit the branch above - close explicitly.
+  window.addEventListener('scroll', () => closeAllTeamPopovers(), { passive: true, capture: true });
 }
 
 /* ========================================================================== *
