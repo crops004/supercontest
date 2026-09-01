@@ -116,8 +116,11 @@ def forgot_password():
         html = render_template("email/reset_password.html", reset_url=reset_url, user=user)
         text = render_template("email/reset_password.txt", reset_url=reset_url, user=user)
 
-        # Send
-        send_email(subject="Reset your password", recipients=email, html=html, text=text)
+        # Send (log but don't surface failures - avoid account enumeration)
+        try:
+            send_email(subject="Reset your password", recipients=email, html=html, text=text)
+        except Exception:
+            current_app.logger.exception("[password reset] send failed for %s", email)
 
         flash(success_msg, "auth_success")
         return redirect(url_for("auth.login"))

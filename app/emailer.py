@@ -8,6 +8,10 @@ SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 
 def send_email(subject, recipients, text=None, html=None, sender=None) -> bool:
+    """Raises on failure (bad API key, over quota, unverified sender, etc.)
+    so callers can record/display the actual reason instead of a bare
+    False - historically every failure landed in the DB with a blank error
+    message because this used to swallow the exception here."""
     if isinstance(recipients, str):
         recipients = [recipients]
     message = Mail(
@@ -20,14 +24,24 @@ def send_email(subject, recipients, text=None, html=None, sender=None) -> bool:
     try:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         resp = sg.send(message)
-        return resp.status_code == 202
     except Exception as e:
-        # Log to Flask’s logger if available; otherwise print
         try:
             current_app.logger.exception("SendGrid error: %s", e)
         except Exception:
             print("SendGrid error:", e)
-        return False
+        raise
+
+    if resp.status_code != 202:
+        body = getattr(resp, "body", b"")
+        body = body.decode("utf-8", "replace") if isinstance(body, bytes) else body
+        err = f"SendGrid returned {resp.status_code}: {body}"
+        try:
+            current_app.logger.error(err)
+        except Exception:
+            print(err)
+        raise RuntimeError(err)
+
+    return True
 
 def send_template(subject, recipients, name, **ctx) -> bool:
     """

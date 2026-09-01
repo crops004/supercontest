@@ -74,8 +74,31 @@
   </div>
 
   <!-- Inline preview target -->
-  <div id="preview-container" class="rounded-xl border border-border bg-foreground p-4 min-h-[120px]">
+  <div id="preview-container" class="rounded-xl border border-border bg-foreground p-4 min-h-[120px] mb-4">
     <p class="text-copy-light">Select a preview above to load it here.</p>
+  </div>
+
+  <!-- Send a real test email -->
+  <div class="rounded-xl border border-border bg-foreground p-4">
+    <h2 class="text-lg font-semibold mb-1">Send a test email</h2>
+    <p class="text-sm text-copy-lighter mb-3">
+      Sends the real email through SendGrid to one address only - good for checking
+      that sending still works and that it looks right in your inbox.
+    </p>
+    <div class="flex flex-wrap items-center gap-2">
+      <input id="test-email-to" type="email" placeholder="you@example.com"
+             value="{{ current_user.email or '' }}"
+             class="border border-border rounded px-2 py-1 bg-background text-copy flex-1 min-w-[220px]">
+      <button id="send-test-weekly" type="button"
+        class="px-3 py-2 rounded-lg bg-primary text-primary-content text-sm font-semibold hover:bg-primary-dark">
+        Send Weekly Spreads test
+      </button>
+      <button id="send-test-reminder" type="button"
+        class="px-3 py-2 rounded-lg bg-primary text-primary-content text-sm font-semibold hover:bg-primary-dark">
+        Send Picks Reminder test
+      </button>
+    </div>
+    <p id="test-email-status" class="text-sm mt-2"></p>
   </div>
 </div>
 {% endblock %}
@@ -172,6 +195,40 @@
   // Optional: auto-load HTML preview initially
   const firstBtn = document.querySelector('button[data-base][data-type="html"]');
   if (firstBtn) loadPreview(firstBtn.dataset.base, firstBtn.dataset.type);
+
+  // Send-a-test-email panel
+  const toInput = document.getElementById('test-email-to');
+  const statusEl = document.getElementById('test-email-status');
+  const sendUrls = {
+    weekly: "{{ url_for('admin.send_weekly_spreads_email') }}",
+    reminder: "{{ url_for('admin.send_picks_reminder_test') }}",
+  };
+
+  async function sendTest(kind) {
+    const to = (toInput?.value || '').trim();
+    if (!to) {
+      statusEl.textContent = 'Enter an email address first.';
+      statusEl.className = 'text-sm mt-2 text-error';
+      return;
+    }
+    const week = weekSel?.value || '';
+    const url = `${sendUrls[kind]}?week=${encodeURIComponent(week)}&to=${encodeURIComponent(to)}`;
+
+    statusEl.textContent = 'Sending…';
+    statusEl.className = 'text-sm mt-2 text-copy-lighter';
+    try {
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+      const body = await res.text();
+      statusEl.textContent = body;
+      statusEl.className = `text-sm mt-2 ${res.ok ? 'text-success' : 'text-error'}`;
+    } catch (err) {
+      statusEl.textContent = `❌ failed: ${err}`;
+      statusEl.className = 'text-sm mt-2 text-error';
+    }
+  }
+
+  document.getElementById('send-test-weekly')?.addEventListener('click', () => sendTest('weekly'));
+  document.getElementById('send-test-reminder')?.addEventListener('click', () => sendTest('reminder'));
 })();
 </script>
 {% endblock %}

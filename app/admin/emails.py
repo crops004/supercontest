@@ -130,13 +130,16 @@ def send_weekly_spreads_email():
     except Exception:
         text_body = None
 
-    ok = send_email(
-        subject=f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads",
-        recipients=to,
-        html=html_body,
-        text=text_body,
-    )
-    return ("✅ sent", 200) if ok else ("❌ failed", 500)
+    try:
+        send_email(
+            subject=f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads",
+            recipients=to,
+            html=html_body,
+            text=text_body,
+        )
+        return "✅ sent", 200
+    except Exception as e:
+        return f"❌ failed: {e}", 500
 
 @bp.post("/email/weekly-spreads/send-all")
 @login_required
@@ -589,6 +592,34 @@ def preview_picks_reminder_txt():
     week = request.args.get("week", type=int) or current_week_number()
     ctx = _build_reminder_ctx(week)
     return render_template("email/picks_reminder.txt", **ctx), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+@bp.get("/email/picks-reminder/send-test")
+@login_required
+def send_picks_reminder_test():
+    """Sends the picks-reminder template to a single address - for checking
+    that SendGrid is actually working, not the real reminder run."""
+    to = request.args.get("to")
+    if not to:
+        return "Add ?to=you@example.com", 400
+
+    week = request.args.get("week", type=int) or current_week_number()
+    ctx = _build_reminder_ctx(week)
+    html_body = render_template("email/picks_reminder.html", **ctx)
+    try:
+        text_body = render_template("email/picks_reminder.txt", **ctx)
+    except Exception:
+        text_body = None
+
+    try:
+        send_email(
+            subject=f"[TEST] Reminder: finish your Week {week} picks",
+            recipients=to,
+            html=html_body,
+            text=text_body,
+        )
+        return "✅ sent", 200
+    except Exception as e:
+        return f"❌ failed: {e}", 500
 
 def _send_picks_reminder_to_incomplete(week: int, log_row: WeeklyEmailLog) -> tuple[int, int, list[str]]:
     ctx = _build_reminder_ctx(week)
