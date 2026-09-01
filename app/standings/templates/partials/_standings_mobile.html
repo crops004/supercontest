@@ -1,5 +1,5 @@
 {% for r in rows %}
-  <details class="bg-foreground border border-border rounded-2xl p-3 my-2">
+  <details class="bg-foreground border border-border rounded-2xl p-3 my-2" data-user-row="{{ r.user_id }}">
     <summary class="flex flex-col gap-1 cursor-pointer">
       <div class="font-bold text-copy">{{ r.display_name }}</div>
       <div class="text-[0.95rem] text-copy flex flex-wrap gap-1">

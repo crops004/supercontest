@@ -32,7 +32,7 @@
 
     <tbody class="divide-y divide-border">
       {% for r in rows %}
-      <tr class="hover:bg-background">
+      <tr class="hover:bg-background" data-user-row="{{ r.user_id }}">
         <td class="px-4 py-3 font-bold">{{ r.display_name }}</td>
 
         {% for p in r.weekly_picks %}

@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from app.extensions import db
 from app.models import Pick, User, Game, TeamGameATS
 from app.scoring import points_for_pick
-from app.services.season import current_season_id
+from app.services.season import current_season_id, get_current_season
+from app.services.standings_trend import get_cumulative_points_trend, REGULAR_SEASON_WEEKS
 from . import bp
 
 
@@ -80,9 +81,14 @@ def standings():
 
     # --- determine display week / bounds ---
     season_id = current_season_id()
+    season = get_current_season()
     cur_week = get_current_week()
     min_week = db.session.query(func.min(Game.week)).filter(Game.season_id == season_id).scalar() or 0
     max_week = db.session.query(func.max(Game.week)).filter(Game.season_id == season_id).scalar() or 0
+    # Week 19 (tiebreaker) only counts if explicitly enabled for this season.
+    if not season.uses_week19:
+        cur_week = min(cur_week, REGULAR_SEASON_WEEKS)
+        max_week = min(max_week, REGULAR_SEASON_WEEKS)
 
     mock_week = request.args.get("mock_week", type=int)
     if mock_week is not None:
@@ -246,6 +252,8 @@ def standings():
     show_left = display_week > min_week
     show_right = display_week < cur_week
 
+    trend = get_cumulative_points_trend(current_season_id(), display_week)
+
     return render_template(
         "standings.html",
         rows=rows,
@@ -256,4 +264,5 @@ def standings():
         mock_week=mock_week,
         min_week=min_week,
         max_week=max_week,
+        trend=trend,
     )

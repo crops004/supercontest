@@ -34,6 +34,36 @@
     <div class="text-copy-lighter text-sm">Current week: {{ current_week }}</div>
   </div>
 
+  <!-- Standings trend chart -->
+  <div class="rounded-xl border border-border bg-foreground p-4 mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <h2 class="text-sm font-semibold text-copy-light">Points by week</h2>
+      <div class="flex items-center gap-2">
+        <div class="flex rounded-lg border border-border overflow-hidden text-xs" role="group" aria-label="Week range">
+          <button type="button" data-trend-range="full"
+                  class="px-2.5 py-1 bg-primary text-primary-content" aria-pressed="true">Full Season</button>
+          <button type="button" data-trend-range="8"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Last 8</button>
+          <button type="button" data-trend-range="4"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Last 4</button>
+        </div>
+        <div class="flex rounded-lg border border-border overflow-hidden text-xs" role="group" aria-label="Chart view">
+          <button type="button" data-trend-mode="all"
+                  class="px-2.5 py-1 bg-primary text-primary-content" aria-pressed="true">All</button>
+          <button type="button" data-trend-mode="top"
+                  class="px-2.5 py-1 bg-background text-copy-light" aria-pressed="false">Me + Top 5</button>
+        </div>
+      </div>
+    </div>
+    <div class="relative h-56 md:h-72">
+      <canvas id="trend-chart" data-current-user-id="{{ current_user.id if current_user.is_authenticated else '' }}"
+              aria-label="Cumulative points by week for each player" role="img"></canvas>
+    </div>
+    <div id="trend-legend" class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs"></div>
+    <p class="text-xs text-copy-lighter mt-2 hidden md:block">Hover or tap a row in the table below to highlight that player's line.</p>
+    <p class="text-xs text-copy-lighter mt-2 md:hidden">Tap a row below to highlight that player's line.</p>
+  </div>
+
   <!-- Mobile cards -->
   <div class="block sm:hidden" aria-label="Standings (mobile)">
     {% include "partials/_standings_mobile.html" %}
@@ -45,4 +75,12 @@
   </div>
 </div>
 
+<script type="application/json" id="trend-data">{{ trend | tojson }}</script>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/trend-chart.js') }}"></script>
 {% endblock %}
