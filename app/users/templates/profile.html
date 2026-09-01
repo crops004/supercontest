@@ -90,7 +90,7 @@
     <!-- Entry Payment (full width row 2) -->
     <section class="bg-foreground border border-border rounded-xl p-4 md:order-3 md:col-span-2">
       <h2 class="text-xl font-semibold mb-3">Entry Payment</h2>
-      {% if current_user.entry_paid %}
+      {% if entry_paid %}
       <span class="chip win">Paid</span>
       {% else %}
       <div class="flex items-center gap-2">

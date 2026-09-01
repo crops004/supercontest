@@ -9,6 +9,8 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import User
 from app.emailer import send_email
+from app.services.season import current_season_id
+from app.services.roster import get_or_create_user_season
 from . import bp
 
 @bp.route('/register', methods=['GET', 'POST'])
@@ -43,6 +45,9 @@ def register():
         u.last_name = last
         u.set_password(password)  # sets password_hash
         db.session.add(u)
+        db.session.commit()
+
+        get_or_create_user_season(u.id, current_season_id())
         db.session.commit()
 
         flash("Registration successful. Please log in.", 'auth_success')

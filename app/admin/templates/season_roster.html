@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ season.year }} Roster{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[700px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">{{ season.year }} Roster</h1>
+    <a href="{{ url_for('admin.seasons') }}" class="text-sm hover:underline">← Back to Seasons</a>
+  </div>
+
+  <div class="rounded-xl border border-border bg-foreground p-4">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-copy-light border-b border-border">
+          <th class="py-2 pr-4">Player</th>
+          <th class="py-2 pr-4">Playing</th>
+          <th class="py-2">Paid</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="border-b border-border/50">
+          <td class="py-2 pr-4">{{ row.user.display_full_name }}</td>
+          <td class="py-2 pr-4">
+            <form method="post" action="{{ url_for('admin.toggle_roster_playing', season_id=season.id, user_id=row.user.id) }}">
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" onchange="this.form.requestSubmit()"
+                       {{ 'checked' if row.user_season.is_playing else '' }}
+                       class="h-4 w-4 rounded border-border bg-background accent-primary">
+              </label>
+            </form>
+          </td>
+          <td class="py-2">
+            <form method="post" action="{{ url_for('admin.toggle_roster_paid', season_id=season.id, user_id=row.user.id) }}">
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" onchange="this.form.requestSubmit()"
+                       {{ 'checked' if row.user_season.entry_paid else '' }}
+                       class="h-4 w-4 rounded border-border bg-background accent-primary">
+              </label>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

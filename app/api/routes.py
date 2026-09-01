@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, current_app, make_response, url_for, reque
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from app.extensions import db
-from app.models import Game
+from app.models import Game, UserSeason
 from app.services.picks import remaining_picks_this_week
 from app.services.season import current_season_id
 
@@ -69,7 +69,10 @@ def _current_contest_week() -> int | None:
 @login_required
 def billing_status():
     # If you ever want a global toggle for this, mirror SHOW_PICKS_BANNER handling
-    unpaid = not bool(getattr(current_user, "entry_paid", False))
+    user_season = UserSeason.query.filter_by(
+        user_id=current_user.id, season_id=current_season_id()
+    ).first()
+    unpaid = not bool(user_season.entry_paid) if user_season else True
     wk = _current_contest_week() or 1
 
     # height factor by week

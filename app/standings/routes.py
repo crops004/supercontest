@@ -12,6 +12,7 @@ from app.models import Pick, User, Game, TeamGameATS
 from app.scoring import points_for_pick
 from app.services.season import current_season_id, get_current_season
 from app.services.standings_trend import get_cumulative_points_trend, REGULAR_SEASON_WEEKS
+from app.services.roster import roster_user_ids
 from . import bp
 
 
@@ -98,7 +99,11 @@ def standings():
     display_week = cur_week if week_param is None else max(min_week, min(week_param, cur_week))
 
     # --- users & name formatting (First or First L.) ---
-    users = User.query.order_by(User.username.asc()).all()
+    roster_ids = roster_user_ids(season_id)
+    users_query = User.query
+    if roster_ids is not None:
+        users_query = users_query.filter(User.id.in_(roster_ids))
+    users = users_query.order_by(User.username.asc()).all()
 
     def split_name(u: User) -> tuple[str, str | None]:
         """

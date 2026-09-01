@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from app.extensions import db
 from app.models import Pick, Game, TeamGameATS, User
 from app.scoring import points_for_pick
+from app.services.roster import roster_user_ids
 
 # NFL regular season is weeks 1-18. Week 19 only ever gets used if a tiebreaker
 # game is needed - it should never silently count toward normal standings/history.
@@ -33,12 +34,22 @@ def _display_names(users: List[User]) -> Dict[int, str]:
     return names
 
 
+def _roster_users(season_id: int) -> List[User]:
+    """Users playing this season, ordered by username (falls back to everyone
+    if this season predates roster tracking)."""
+    ids = roster_user_ids(season_id)
+    q = User.query
+    if ids is not None:
+        q = q.filter(User.id.in_(ids))
+    return q.order_by(User.username.asc()).all()
+
+
 def get_cumulative_points_trend(season_id: int, through_week: int) -> dict:
     """
     Returns {"weeks": [1..through_week], "series": [{"user_id", "display_name", "cumulative": [...]}, ...]}
     `cumulative[i]` is each user's total points through weeks[i].
     """
-    users = User.query.order_by(User.username.asc()).all()
+    users = _roster_users(season_id)
     display_names = _display_names(users)
 
     pairs = (
@@ -102,7 +113,7 @@ def get_final_standings(season_id: int, max_week: Optional[int] = None) -> List[
     then name). Pass max_week to exclude weeks beyond it (e.g. a week-19
     tiebreaker game) from the totals.
     """
-    users = User.query.order_by(User.username.asc()).all()
+    users = _roster_users(season_id)
     display_names = _display_names(users)
 
     query = (

@@ -2,13 +2,18 @@ from . import bp
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user, logout_user
 from app.extensions import db
-from app.models import User
+from app.models import User, UserSeason
+from app.services.season import current_season_id
 import re
 
 @bp.get("/me")
 @login_required
 def profile():
-    return render_template("profile.html")
+    user_season = UserSeason.query.filter_by(
+        user_id=current_user.id, season_id=current_season_id()
+    ).first()
+    entry_paid = bool(user_season.entry_paid) if user_season else False
+    return render_template("profile.html", entry_paid=entry_paid)
 
 @bp.post("/me/notifications")
 @login_required

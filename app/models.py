@@ -14,7 +14,6 @@ class User(UserMixin,db.Model):
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     first_name = db.Column(db.String(80))
     last_name  = db.Column(db.String(80))
-    entry_paid = db.Column(db.Boolean, default=False)
     # Notifications
     notify_lines_posted   = db.Column(db.Boolean, default=True)
     notify_picks_reminder = db.Column(db.Boolean, default=True)
@@ -226,17 +225,16 @@ class WeeklyEmailRecipientLog(db.Model):
 
 class UserSeason(db.Model):
     """
-    Per-season entry-fee tracking (mapped to an existing table from an earlier,
-    not-yet-wired-in attempt at this feature). Not used by any app logic yet -
-    User.entry_paid is still the flat, current-season source of truth. Mapped
-    here so Alembic autogenerate doesn't mistake this table for something to
-    drop.
+    Per-season roster + entry-fee tracking. A row's existence means the user
+    has ever been rostered for that season; is_playing controls whether they
+    currently count toward that season's standings/history/trend chart.
     """
     __tablename__ = "user_season"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     season_id = db.Column(db.Integer, db.ForeignKey('season.id', ondelete='CASCADE'), nullable=False)
+    is_playing = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
     entry_paid = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())

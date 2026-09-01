@@ -18,6 +18,7 @@
           <th class="py-2 pr-4">Start date</th>
           <th class="py-2 pr-4">Active?</th>
           <th class="py-2 pr-4">Week 19 (tiebreaker)</th>
+          <th class="py-2 pr-4"></th>
           <th class="py-2"></th>
         </tr>
       </thead>
@@ -53,6 +54,9 @@
                 </span>
               </label>
             </form>
+          </td>
+          <td class="py-2 pr-4">
+            <a href="{{ url_for('admin.season_roster', season_id=s.id) }}" class="text-xs px-2 py-1 rounded border border-border hover:opacity-90 whitespace-nowrap">Manage roster</a>
           </td>
           <td class="py-2">
             {% if not s.is_active %}

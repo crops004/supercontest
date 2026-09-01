@@ -7,8 +7,9 @@ from flask import request, render_template, redirect, url_for, flash
 from flask_login import login_required
 
 from app.extensions import db
-from app.models import Season, Game, Pick
+from app.models import Season, Game, Pick, User, UserSeason
 from app.services.standings_trend import REGULAR_SEASON_WEEKS
+from app.services.roster import bootstrap_season_roster, get_or_create_user_season
 
 from . import bp
 
@@ -76,6 +77,8 @@ def create_season():
     db.session.add(season)
     db.session.commit()
 
+    bootstrap_season_roster(season.id)
+
     flash(f"Season {year} created and set as active.", "success")
     return redirect(url_for("admin.seasons"))
 
@@ -90,8 +93,47 @@ def make_season_active(season_id):
     Season.query.filter_by(is_active=True).update({"is_active": False})
     season.is_active = True
     db.session.commit()
+
+    bootstrap_season_roster(season.id)
+
     flash(f"Season {season.year} is now active.", "success")
     return redirect(url_for("admin.seasons"))
+
+
+@bp.get("/seasons/<int:season_id>/roster")
+@login_required
+def season_roster(season_id):
+    season = Season.query.get_or_404(season_id)
+    bootstrap_season_roster(season.id)  # covers users created after the season started
+
+    user_seasons = {
+        us.user_id: us
+        for us in UserSeason.query.filter_by(season_id=season.id).all()
+    }
+    users = User.query.order_by(User.username.asc()).all()
+    rows = [
+        {"user": u, "user_season": user_seasons[u.id]}
+        for u in users if u.id in user_seasons
+    ]
+    return render_template("season_roster.html", season=season, rows=rows)
+
+
+@bp.post("/seasons/<int:season_id>/roster/<int:user_id>/toggle-playing")
+@login_required
+def toggle_roster_playing(season_id, user_id):
+    us = get_or_create_user_season(user_id, season_id)
+    us.is_playing = not us.is_playing
+    db.session.commit()
+    return redirect(url_for("admin.season_roster", season_id=season_id))
+
+
+@bp.post("/seasons/<int:season_id>/roster/<int:user_id>/toggle-paid")
+@login_required
+def toggle_roster_paid(season_id, user_id):
+    us = get_or_create_user_season(user_id, season_id)
+    us.entry_paid = not us.entry_paid
+    db.session.commit()
+    return redirect(url_for("admin.season_roster", season_id=season_id))
 
 
 @bp.post("/seasons/<int:season_id>/set-start-date")
