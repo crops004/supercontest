@@ -9,7 +9,10 @@ from flask_login import login_required
 from sqlalchemy.sql import sqltypes as T
 
 from app.extensions import db
-from app.models import Game, Pick, User, TeamGameATS, WeeklyEmailLog, WeeklyEmailRecipientLog
+from app.models import (
+    Game, Pick, User, TeamGameATS, WeeklyEmailLog, WeeklyEmailRecipientLog,
+    Season, UserSeason, ChatMessage,
+)
 
 from . import bp
 
@@ -23,6 +26,9 @@ MODEL_MAP = {
     "ats": TeamGameATS,
     "email_log": WeeklyEmailLog,
     "email_recipients": WeeklyEmailRecipientLog,
+    "seasons": Season,
+    "user_seasons": UserSeason,
+    "chat_messages": ChatMessage,
 }
 
 def _get_model_or_404(name: str):
