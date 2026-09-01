@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}User Emails{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[700px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">User Emails</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <div class="rounded-xl border border-border bg-foreground p-4 mb-4">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">{{ with_email|length }} email{{ 's' if with_email|length != 1 else '' }}</h2>
+      <button id="copy-emails-btn" type="button"
+        class="px-3 py-1.5 rounded-lg bg-primary text-primary-content text-sm font-semibold hover:bg-primary-dark">
+        Copy all
+      </button>
+    </div>
+    <p class="text-xs text-copy-lighter mb-2">
+      Comma-separated, ready to paste into Gmail's "Bcc" field.
+    </p>
+    <textarea id="email-list" readonly rows="6"
+      class="w-full rounded-lg border border-border bg-background text-copy text-sm p-3 resize-y">{{ email_list }}</textarea>
+  </div>
+
+  {% if without_email %}
+  <div class="rounded-xl border border-border bg-foreground p-4">
+    <h2 class="text-sm font-semibold text-copy-light mb-2">No email on file ({{ without_email|length }})</h2>
+    <ul class="text-sm text-copy-lighter list-disc list-inside">
+      {% for u in without_email %}
+      <li>{{ u.display_full_name }} ({{ u.username }})</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (() => {
+    const btn = document.getElementById('copy-emails-btn');
+    const textarea = document.getElementById('email-list');
+    btn?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+      } catch (err) {
+        textarea.select();
+        document.execCommand('copy');
+      }
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
+  })();
+</script>
+{% endblock %}

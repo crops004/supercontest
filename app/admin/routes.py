@@ -60,6 +60,23 @@ def index():
 
 
 # ------------------------------------------------------------
+# USER EMAILS (copy list for sending a one-off email from Gmail, etc.)
+# ------------------------------------------------------------
+@bp.get("/user-emails")
+@login_required
+def user_emails():
+    users = User.query.order_by(User.username.asc()).all()
+    with_email = [u for u in users if (u.email or "").strip()]
+    without_email = [u for u in users if not (u.email or "").strip()]
+    return render_template(
+        "user_emails.html",
+        with_email=with_email,
+        without_email=without_email,
+        email_list=", ".join(u.email.strip() for u in with_email),
+    )
+
+
+# ------------------------------------------------------------
 # ACTION BUTTONS PAGE (hide all ops behind this card)
 # ------------------------------------------------------------
 @bp.get("/actions")
