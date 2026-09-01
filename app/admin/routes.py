@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, abort, current_app
 from flask_login import login_required
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from collections import defaultdict, OrderedDict
 from typing import List, Dict
 
@@ -238,15 +239,23 @@ def admin_tuesday_lock_cycle():
 def cron_tuesday_lock_cycle():
     """
     Refresh spreads for UNLOCKED games, then lock & snapshot a target week.
-    Runs whenever called.
+    Self-gated to local Tue 11:00 (the ~11:30 AM MDT slot) unless force=1, so
+    it's safe to ping on any schedule (e.g. hourly) without re-snapshotting
+    the "closing" lines more than once a week.
 
     Query params:
       - week: int (default = current_week_number())
       - dry_run: 1/true to simulate (no commit)
+      - force: 1/true to bypass the day/time check
     """
     token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
     if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
+
+    force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    if not force and (now_local.weekday() != 1 or now_local.hour != 11):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 11:00"}), 200
 
     week = request.args.get("week", type=int) or current_week_number()
     dry_run = str(request.args.get("dry_run", "")).strip().lower() in ("1","true","yes","y","on")
@@ -313,17 +322,24 @@ def _finalize_week_ats(week: int, *, days_from: int = 3) -> dict:
 @bp.post("/internal/cron/finalize-ats")
 def cron_finalize_ats():
     """
-    Finalize ATS for a target week, anytime this endpoint is called.
-    Defaults to LAST week (current_week_number() - 1).
+    Finalize ATS for a target week. Defaults to LAST week
+    (current_week_number() - 1). Self-gated to local Tue 00:00 unless
+    force=1, so it's safe to ping on any schedule (e.g. hourly).
 
     Query params:
       - week: int (override target week; default = current_week_number()-1)
       - days_from: int (default 3)
       - dry_run: 1/true to simulate and return what would happen (no commit)
+      - force: 1/true to bypass the day/time check
     """
     token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
     if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
+
+    force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    if not force and (now_local.weekday() != 1 or now_local.hour != 0):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 00:00"}), 200
 
     cur = current_week_number()
     default_week = max(1, (cur or 1) - 1)
@@ -398,11 +414,48 @@ def admin_scores_and_finalize_week():
     return redirect(url_for("admin.actions", week=week))
 
 
+def _in_score_refresh_window(now_local: datetime) -> bool:
+    """
+    True if any of today's (Denver-local) games kicked off 2-4 hours ago -
+    the window games from that slot are typically wrapping up in. Driven by
+    real kickoff times already in the DB rather than a hardcoded day/time
+    list, so it applies the same to a normal Sun/Mon/Thu slate and to an
+    irregular game (Wed opener, Thanksgiving, an international game, etc.)
+    without needing any manual updates.
+    """
+    today = now_local.date()
+    kickoffs = (
+        db.session.query(Game.kickoff_at)
+        .filter(Game.season_id == current_season_id(), Game.kickoff_at.isnot(None))
+        .distinct()
+        .all()
+    )
+    for (kickoff,) in kickoffs:
+        kickoff_local = kickoff.astimezone(now_local.tzinfo)
+        if kickoff_local.date() != today:
+            continue
+        hours_since = (now_local - kickoff_local).total_seconds() / 3600
+        if 2.0 <= hours_since <= 4.0:
+            return True
+    return False
+
+
 @bp.post("/internal/cron/refresh-scores")
 def cron_refresh_scores():
+    """
+    Query params:
+      - days_from: int (default 3)
+      - force: 1/true to bypass the "is a game probably wrapping up right
+        now" check
+    """
     token = request.headers.get("X-CRON-TOKEN") or request.args.get("token")
     if not token or token != current_app.config.get("CRON_SECRET"):
         abort(401)
+
+    force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+    now_local = datetime.now(ZoneInfo("America/Denver"))
+    if not force and not _in_score_refresh_window(now_local):
+        return jsonify({"ok": True, "skipped": True, "reason": "no game likely finishing right now"}), 200
 
     days_from = request.args.get("days_from", type=int) or 3
     try:

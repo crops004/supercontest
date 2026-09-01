@@ -1,0 +1,57 @@
+name: Supercontest cron
+
+# Replaces Render's paid Scheduled Jobs. Every job below is self-gated in the
+# app (app/admin/routes.py / app/admin/emails.py) based on real local time
+# (weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats) or real
+# kickoff times already in the DB (refresh-scores), so it's safe to ping all
+# of them far more often than they actually need to run - each call is a
+# harmless no-op outside its real window. That also sidesteps GitHub Actions'
+# UTC-only cron and DST entirely, since the app does the local-time check.
+on:
+  schedule:
+    - cron: '0 * * * *'     # hourly: weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats
+    - cron: '*/15 * * * *'  # every 15 min: refresh-scores
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Bypass every job''s time gate (force=1) - for manual testing'
+        type: boolean
+        default: false
+
+permissions: {}
+
+env:
+  BASE_URL: https://supercontest.onrender.com
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hourly jobs (weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats)
+        if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -u
+          QUERY=""
+          [ "${{ inputs.force }}" = "true" ] && QUERY="?force=1"
+          FAIL=0
+          for path in weekly-email picks-reminder tuesday-lock-cycle finalize-ats; do
+            echo "== $path =="
+            if ! curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
+                 "$BASE_URL/admin/internal/cron/$path$QUERY"; then
+              echo "::error::$path failed"
+              FAIL=1
+            fi
+            echo
+          done
+          exit $FAIL
+
+      - name: Score refresh
+        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -u
+          QUERY=""
+          [ "${{ inputs.force }}" = "true" ] && QUERY="?force=1"
+          echo "== refresh-scores =="
+          curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
+            "$BASE_URL/admin/internal/cron/refresh-scores$QUERY"
