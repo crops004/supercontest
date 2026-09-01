@@ -26,11 +26,11 @@
   </div>
 </section>
 
-<!-- Sticky in-page nav: swipeable chips (no arrows, no JS) -->
+<!-- Sticky in-page nav: swipeable chips, with fade + arrow hinting there's more to scroll -->
 <nav class="sticky top-[56px] z-30 bg-foreground/80 backdrop-blur border-b border-border">
     <div class="max-w-5xl mx-auto px-0 sm:px-6">
         <div class="relative sm:static">
-            <ul class="flex gap-2 py-3 px-6 sm:px-0
+            <ul id="about-pills" class="flex gap-2 py-3 px-6 sm:px-0
                overflow-x-auto sm:overflow-visible
                snap-x snap-mandatory scroll-px-6 scroll-smooth
                [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
@@ -67,12 +67,24 @@
                 </li>
             </ul>
 
-            <!-- Soft fade edges on mobile -->
-            <div
-                class="pointer-events-none sm:hidden absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-foreground to-foreground/0">
+            <!-- Fade + arrow hint on mobile, opacity driven by actual scroll position -->
+            <div id="pill-arrow-left"
+                class="pointer-events-none sm:hidden absolute inset-y-0 left-0 w-9 flex items-center justify-start
+                       bg-gradient-to-r from-foreground to-foreground/0 opacity-0 transition-opacity duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                     class="w-4 h-4 text-copy-light">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
             </div>
-            <div
-                class="pointer-events-none sm:hidden absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-foreground to-foreground/0">
+            <div id="pill-arrow-right"
+                class="pointer-events-none sm:hidden absolute inset-y-0 right-0 w-9 flex items-center justify-end
+                       bg-gradient-to-l from-foreground to-foreground/0 opacity-0 transition-opacity duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                     class="w-4 h-4 text-copy-light">
+                    <path d="M9 18l6-6-6-6" />
+                </svg>
             </div>
         </div>
     </div>
@@ -254,6 +266,7 @@
   </section>
 
   <!-- CTA -->
+  {% if not current_user.is_authenticated %}
   <section class="border-t border-border pt-8">
     <div class="rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-primary-content p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
@@ -268,8 +281,31 @@
       </a>
     </div>
   </section>
+  {% endif %}
 
 </div>
+
+<!-- Pill nav scroll arrows: show/hide based on actual scroll position -->
+<script>
+  (function () {
+    const scroller = document.getElementById('about-pills');
+    const leftArrow = document.getElementById('pill-arrow-left');
+    const rightArrow = document.getElementById('pill-arrow-right');
+    if (!scroller || !leftArrow || !rightArrow) return;
+
+    function updateArrows() {
+      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+      const atStart = scroller.scrollLeft <= 2;
+      const atEnd = scroller.scrollLeft >= maxScroll - 2;
+      leftArrow.style.opacity = (maxScroll > 4 && !atStart) ? '1' : '0';
+      rightArrow.style.opacity = (maxScroll > 4 && !atEnd) ? '1' : '0';
+    }
+
+    scroller.addEventListener('scroll', updateArrows, { passive: true });
+    window.addEventListener('resize', updateArrows);
+    updateArrows();
+  })();
+</script>
 
 <!-- Share logic (no external libs) -->
 <script>

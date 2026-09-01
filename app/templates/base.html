@@ -67,10 +67,17 @@
         Standings
       </a>
 
+      <a href="{{ url_for('history.history') }}"
+        class="{{ 'text-copy font-semibold underline underline-offset-4' if ep.startswith('history.') else 'text-copy-lighter hover:text-copy-light' }}">
+        History
+      </a>
+
+      {% if not current_user.is_authenticated %}
       <a href="{{ url_for('main.about') }}"
         class="{{ 'text-copy font-semibold underline underline-offset-4' if ep == 'main.about' else 'text-copy-lighter hover:text-copy-light' }}">
         About
       </a>
+      {% endif %}
 
       <!-- Small theme toggle -->
       <button id="themeToggle" class="flex h-8 w-8 items-center justify-center rounded-full
@@ -150,7 +157,8 @@
 {% if current_user.is_authenticated %}
   <!-- Chat sidebar handle + drawer -->
   <button id="chat-handle" type="button" aria-controls="chat-drawer" aria-expanded="false"
-    class="fixed top-1/2 right-0 z-40 flex items-center gap-2 rounded-l-lg bg-secondary px-3 py-2 text-sm font-semibold text-secondary-content shadow-lg transition hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/60 transform -translate-y-1/2">
+    class="fixed right-0 z-40 flex items-center gap-2 rounded-l-lg bg-secondary px-3 py-2 text-sm font-semibold text-secondary-content shadow-lg transition hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary/60"
+    style="bottom: calc(4rem + 16px);">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
       <path d="M4 4a2 2 0 012-2h12a2 2 0 012 2v11a2 2 0 01-2 2h-6.586l-3.707 3.707A1 1 0 017 20.293V17H6a2 2 0 01-2-2V4z" />
     </svg>

@@ -30,7 +30,7 @@
         </div>
 
         <!-- Remember + Actions -->
-        <div class="flex items-center justify-between pt-2">
+        <div class="pt-2 space-y-4">
           <label class="inline-flex items-center text-sm text-copy-light">
             <input type="checkbox" name="remember"
                    class="h-4 w-4 rounded border-border bg-background text-primary accent-primary
@@ -38,21 +38,21 @@
             <span class="ml-2 select-none">Remember me</span>
           </label>
 
-          <div class="flex gap-2">
+          <button type="submit"
+            class="w-full inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2.5 text-sm font-semibold
+                  shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
+            Sign in
+          </button>
+
+          <div class="flex items-center justify-between text-sm">
             <a href="{{ url_for('auth.forgot_password') }}"
-              class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm"
+              class="text-copy-light hover:text-copy hover:underline"
               title="Email a secure, time-limited link to reset your password">
-              <span class="text-copy">Forgot password?</span>
+              Forgot password?
             </a>
-            <a href="{{ url_for('auth.register') }}"
-              class="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-foreground px-4 py-2 text-sm">
-              <span class="text-copy">Create account</span>
+            <a href="{{ url_for('auth.register') }}" class="text-copy-light hover:text-copy hover:underline">
+              Create account
             </a>
-            <button type="submit"
-              class="inline-flex items-center justify-center rounded-lg bg-primary text-primary-content px-4 py-2 text-sm font-semibold
-                    shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40">
-              Sign in
-            </button>
           </div>
         </div>
       </form>
