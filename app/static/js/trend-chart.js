@@ -15,6 +15,26 @@
   const trend = JSON.parse(dataEl.textContent);
   const currentUserId = parseInt(canvas.dataset.currentUserId || '', 10) || null;
 
+  // Nothing graded yet this season - a 0-vs-0 chart has no meaningful range
+  // (Chart.js just pads it to an arbitrary -1..1), so show a placeholder
+  // instead of a chart that looks broken.
+  const hasAnyPoints = trend.series.some(s => s.cumulative.some(v => v > 0));
+  if (!hasAnyPoints) {
+    const wrap = canvas.parentElement;
+    if (wrap) {
+      wrap.innerHTML = `
+        <div class="h-full flex flex-col items-center justify-center text-center gap-1 text-copy-lighter">
+          <div class="text-2xl">🏈</div>
+          <div class="font-medium text-copy-light">Waiting on the season to get going</div>
+          <div class="text-xs">This chart fills in once games start wrapping up.</div>
+        </div>
+      `;
+    }
+    document.querySelectorAll('[role="group"][aria-label="Week range"], [role="group"][aria-label="Chart view"]')
+      .forEach((el) => { el.style.display = 'none'; });
+    return;
+  }
+
   const PALETTE = ['#3b82f6', '#f97316', '#10b981', '#f43f5e', '#8b5cf6', '#eab308'];
   const MUTED = 'rgba(148, 163, 184, 0.35)';
   const HIGHLIGHT = '#3b82f6';
