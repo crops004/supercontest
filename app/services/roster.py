@@ -19,9 +19,9 @@ def get_or_create_user_season(user_id: int, season_id: int) -> UserSeason:
 def bootstrap_season_roster(season_id: int, *, default_paid: bool = False) -> None:
     """
     Ensure every existing user has a UserSeason row for this season. Starts
-    everyone as not-playing/not-paid - submitting a pick (see
-    mark_user_playing) is what actually opts a user into the season; the
-    admin roster page can also flip either toggle by hand.
+    everyone as not-playing/not-paid - logging in (see mark_user_playing) is
+    what actually opts a user into the season; the admin roster page can
+    also flip either toggle by hand for anyone who logs in but never picks.
     """
     existing_user_ids = {
         uid for (uid,) in
@@ -37,8 +37,9 @@ def bootstrap_season_roster(season_id: int, *, default_paid: bool = False) -> No
 
 
 def mark_user_playing(user_id: int, season_id: int) -> None:
-    """Call when a user successfully submits a pick - opts them into that
-    season's roster if they weren't already in it."""
+    """Call when a user logs in - opts them into that season's roster if
+    they weren't already in it. Admins can toggle off anyone who logs in
+    but never actually submits picks (e.g. after week 1)."""
     us = get_or_create_user_season(user_id, season_id)
     if not us.is_playing:
         us.is_playing = True

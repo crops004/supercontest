@@ -10,7 +10,6 @@ from app.filters import abbr_team
 from app.services.week import current_week_number  # ✅ to compute default selected week
 from app.services.season import current_season_id, get_current_season
 from app.services.team_stats import get_team_ats_summary
-from app.services.roster import mark_user_playing
 
 from . import bp
 
@@ -358,9 +357,6 @@ def submit_picks_api():
         p.chosen_team = team
         db.session.add(p)
 
-    if filtered:
-        mark_user_playing(current_user.id, season_id)
-
     db.session.commit()
 
     # Return DB truth (locked + newly saved)
@@ -441,9 +437,6 @@ def submit_picks():
         p.chosen_team = team
         db.session.add(p)
         inserted += 1
-
-    if inserted:
-        mark_user_playing(current_user.id, season_id)
 
     db.session.commit()
     flash(f"Saved {inserted} pick(s).", "success")

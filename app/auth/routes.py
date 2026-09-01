@@ -10,7 +10,7 @@ from app.extensions import db
 from app.models import User
 from app.emailer import send_email
 from app.services.season import current_season_id
-from app.services.roster import get_or_create_user_season
+from app.services.roster import get_or_create_user_season, mark_user_playing
 from . import bp
 
 @bp.route('/register', methods=['GET', 'POST'])
@@ -180,6 +180,9 @@ def login():
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=remember)
+
+        mark_user_playing(user.id, current_season_id())
+        db.session.commit()
 
         next_url = request.args.get('next')
         if next_url and _is_safe_next_url(next_url):
