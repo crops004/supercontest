@@ -7,16 +7,20 @@ name: Supercontest cron
 # of them far more often than they actually need to run - each call is a
 # harmless no-op outside its real window. That also sidesteps GitHub Actions'
 # UTC-only cron and DST entirely, since the app does the local-time check.
+#
+# Manual runs (workflow_dispatch) are always a dry test, never a real send:
+#   - weekly-email / picks-reminder are never forced here - a plain call
+#     just proves the token/URL/routing work (a 200 "skipped" response),
+#     since force=1 on those would actually send real email to the list.
+#   - tuesday-lock-cycle / finalize-ats are forced WITH dry_run=1, so the
+#     real logic runs but nothing is written.
+#   - refresh-scores is forced directly - it only reads/writes score data,
+#     no external side effects, so this is safe as-is.
 on:
   schedule:
     - cron: '0 * * * *'     # hourly: weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats
     - cron: '*/15 * * * *'  # every 15 min: refresh-scores
-  workflow_dispatch:
-    inputs:
-      force:
-        description: 'Bypass every job''s time gate (force=1) - for manual testing'
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 permissions: {}
 
@@ -32,11 +36,26 @@ jobs:
         if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
         run: |
           set -u
-          QUERY=""
-          [ "${{ inputs.force }}" = "true" ] && QUERY="?force=1"
+          MANUAL=""
+          [ "${{ github.event_name }}" = "workflow_dispatch" ] && MANUAL=1
           FAIL=0
-          for path in weekly-email picks-reminder tuesday-lock-cycle finalize-ats; do
+
+          # Never forced - real send would happen if forced and not already sent today.
+          for path in weekly-email picks-reminder; do
             echo "== $path =="
+            if ! curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
+                 "$BASE_URL/admin/internal/cron/$path"; then
+              echo "::error::$path failed"
+              FAIL=1
+            fi
+            echo
+          done
+
+          # Safe to force on a manual test: dry_run=1 means nothing is written.
+          for path in tuesday-lock-cycle finalize-ats; do
+            QUERY=""
+            [ -n "$MANUAL" ] && QUERY="?force=1&dry_run=1"
+            echo "== $path$QUERY =="
             if ! curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
                  "$BASE_URL/admin/internal/cron/$path$QUERY"; then
               echo "::error::$path failed"
@@ -44,6 +63,7 @@ jobs:
             fi
             echo
           done
+
           exit $FAIL
 
       - name: Score refresh
@@ -51,7 +71,7 @@ jobs:
         run: |
           set -u
           QUERY=""
-          [ "${{ inputs.force }}" = "true" ] && QUERY="?force=1"
-          echo "== refresh-scores =="
+          [ "${{ github.event_name }}" = "workflow_dispatch" ] && QUERY="?force=1"
+          echo "== refresh-scores$QUERY =="
           curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
             "$BASE_URL/admin/internal/cron/refresh-scores$QUERY"
