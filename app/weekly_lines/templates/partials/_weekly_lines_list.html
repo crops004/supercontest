@@ -3,6 +3,36 @@
 {% set disable = disable_inputs|default(false) %}
 {% set show_spreads = (all_locked|default(false)) or admin_preview %}
 {% set header_bg = 'bg-foreground' if admin_preview else 'bg-background' %}
+{% set team_ats = team_ats|default({}) %}
+{% set team_ats_year = team_ats_year|default(None) %}
+{% set team_ats_is_previous = team_ats_is_previous|default(false) %}
+
+{% macro fmt_record(rec) -%}
+{{ rec[0] }}-{{ rec[1] }}-{{ rec[2] }}
+{%- endmacro %}
+
+{% macro team_ats_popover(team_name, is_home) %}
+  {% set stats = team_ats.get(team_name) %}
+  {% set title = (team_ats_year ~ ' ATS') if team_ats_is_previous else 'ATS' %}
+  <div class="fixed z-30 w-36 rounded-lg border border-border bg-background text-copy shadow-lg p-3"
+       data-team-popover hidden>
+    <div class="text-[10px] font-semibold uppercase tracking-wide text-copy-lighter mb-2">{{ title }}</div>
+    {% if stats %}
+      <dl class="space-y-1.5">
+        <div class="flex items-baseline justify-between gap-3">
+          <dt class="text-xs text-copy-light">Overall</dt>
+          <dd class="text-sm font-semibold tabular-nums">{{ fmt_record(stats.overall) }}</dd>
+        </div>
+        <div class="flex items-baseline justify-between gap-3">
+          <dt class="text-xs text-copy-light">{{ 'Home' if is_home else 'Away' }}</dt>
+          <dd class="text-sm font-semibold tabular-nums">{{ fmt_record(stats.home if is_home else stats.away) }}</dd>
+        </div>
+      </dl>
+    {% else %}
+      <div class="text-xs text-copy-lighter">No graded games yet</div>
+    {% endif %}
+  </div>
+{% endmacro %}
 
 <div id="locks-flag" data-all-locked="{{ 1 if all_locked else 0 }}" class="hidden"></div>
 
@@ -88,7 +118,7 @@
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_away else 0 }}">
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="relative flex items-center gap-2 min-w-0" data-team-trigger>
                   <div class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center shrink-0">
                     <img
                       class="max-w-full max-h-full object-contain"
@@ -103,6 +133,7 @@
                       {{ score_badge_ats(r_away, g.final_score_away) }}
                     </div>
                   </div>
+                  {{ team_ats_popover(g.away_team, false) }}
                 </div>
 
                 {% set chip_classes = (
@@ -150,7 +181,7 @@
               <div class="flex items-center justify-between gap-3"
                    data-team-row
                    data-picked="{{ 1 if picked_home else 0 }}">
-                <div class="flex items-center gap-2 min-w-0">
+                <div class="relative flex items-center gap-2 min-w-0" data-team-trigger>
                   <div class="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center shrink-0">
                     <img
                       class="max-w-full max-h-full object-contain"
@@ -165,6 +196,7 @@
                       {{ score_badge_ats(r_home, g.final_score_home) }}
                     </div>
                   </div>
+                  {{ team_ats_popover(g.home_team, true) }}
                 </div>
 
                 {% set chip_classes = (

@@ -4,11 +4,12 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from sqlalchemy import func
 from app.extensions import db
-from app.models import Game, Pick, TeamGameATS
+from app.models import Game, Pick, TeamGameATS, Season
 from app.services.time_utils import day_key, time_key
 from app.filters import abbr_team
 from app.services.week import current_week_number  # ✅ to compute default selected week
-from app.services.season import current_season_id
+from app.services.season import current_season_id, get_current_season
+from app.services.team_stats import get_team_ats_summary
 
 from . import bp
 
@@ -128,6 +129,20 @@ def _select_week_from_request(weeks):
         return weeks[-1]
     return selected
 
+def _team_ats_context(selected_week: int):
+    """
+    Team ATS records for the popover on each team chip.
+    Week 1 shows the previous season's record instead (this season's is
+    still 0-0-0 at that point); every other week shows the current season.
+    Returns (team_ats_dict, season_year_label, is_previous_season).
+    """
+    season = get_current_season()
+    if selected_week == 1:
+        prev = Season.query.filter_by(year=season.year - 1).first()
+        if prev is not None:
+            return get_team_ats_summary(prev.id), prev.year, True
+    return get_team_ats_summary(season.id), season.year, False
+
 # =============================================================================
 # PAGE: Weekly lines (public)
 # Always show all games for the selected week.
@@ -158,6 +173,9 @@ def weekly_lines():
     groups = _build_groups_by_day_time(games, tzname)
     now_utc = datetime.now(timezone.utc)
 
+    # Per-team ATS records for the hover/tap popover on each team chip
+    team_ats, team_ats_year, team_ats_is_previous = _team_ats_context(selected_week)
+
     # Current user's picks (for pre-check UI)
     picks_by_game = {}
     if current_user.is_authenticated:
@@ -183,6 +201,9 @@ def weekly_lines():
         ats_resolved=ats_resolved,
         ats_debug=ats_debug if debug else [],
         debug=debug,
+        team_ats=team_ats,
+        team_ats_year=team_ats_year,
+        team_ats_is_previous=team_ats_is_previous,
         all_locked=all_locked,           # ✅ expose for template
         disable_inputs=disable_inputs,   # ✅ template can gate inputs
     )
@@ -213,6 +234,9 @@ def weekly_lines_fragment():
     groups = _build_groups_by_day_time(games, tzname)
     now_utc = datetime.now(timezone.utc)
 
+    # Per-team ATS records for the hover/tap popover on each team chip
+    team_ats, team_ats_year, team_ats_is_previous = _team_ats_context(selected_week)
+
     # Current user's picks (for pre-check)
     picks_by_game = {}
     if current_user.is_authenticated:
@@ -236,6 +260,9 @@ def weekly_lines_fragment():
         ats_resolved=ats_resolved,
         ats_debug=ats_debug if debug else [],
         debug=debug,
+        team_ats=team_ats,
+        team_ats_year=team_ats_year,
+        team_ats_is_previous=team_ats_is_previous,
         all_locked=all_locked,           # ✅ same as page
         disable_inputs=disable_inputs,   # ✅ same as page
     )

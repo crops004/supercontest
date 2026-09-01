@@ -297,6 +297,76 @@ function attachChipHandlers() {
   });
 }
 
+/* ---------- Team ATS popover (hover on desktop, tap on mobile) ---------- */
+let teamPopoverDelegationBound = false;
+function bindTeamPopoverDelegationOnce() {
+  if (teamPopoverDelegationBound || !gamesEl) return;
+  teamPopoverDelegationBound = true;
+
+  const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const GAP = 10;
+
+  function closeAllTeamPopovers(except) {
+    gamesEl.querySelectorAll('[data-team-popover]').forEach(p => {
+      if (p !== except) p.hidden = true;
+    });
+  }
+
+  // Opens just to the right of (clientX, clientY); flips to the left / clamps
+  // vertically if it would run off the viewport.
+  function openPopoverAt(popover, clientX, clientY) {
+    popover.hidden = false;
+    const rect = popover.getBoundingClientRect();
+    let left = clientX + GAP;
+    if (left + rect.width > window.innerWidth - GAP) {
+      left = clientX - GAP - rect.width;
+    }
+    left = Math.max(GAP, Math.min(left, window.innerWidth - rect.width - GAP));
+
+    let top = clientY - rect.height / 2;
+    top = Math.max(GAP, Math.min(top, window.innerHeight - rect.height - GAP));
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  if (supportsHover) {
+    gamesEl.addEventListener('mouseover', (e) => {
+      const trigger = e.target.closest('[data-team-trigger]');
+      if (!trigger || !gamesEl.contains(trigger)) return;
+      // Ignore moves within the same trigger - only position on genuine entry.
+      if (trigger.contains(e.relatedTarget)) return;
+      const popover = trigger.querySelector('[data-team-popover]');
+      if (popover) openPopoverAt(popover, e.clientX, e.clientY);
+    });
+    gamesEl.addEventListener('mouseout', (e) => {
+      const trigger = e.target.closest('[data-team-trigger]');
+      if (!trigger || !gamesEl.contains(trigger)) return;
+      if (trigger.contains(e.relatedTarget)) return; // still inside the trigger
+      const popover = trigger.querySelector('[data-team-popover]');
+      if (popover) popover.hidden = true;
+    });
+  } else {
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('[data-team-trigger]');
+      if (trigger && gamesEl.contains(trigger)) {
+        e.stopPropagation();
+        const popover = trigger.querySelector('[data-team-popover]');
+        if (!popover) return;
+        const wasHidden = popover.hidden;
+        closeAllTeamPopovers();
+        if (wasHidden) {
+          openPopoverAt(popover, e.clientX, e.clientY);
+        } else {
+          popover.hidden = true;
+        }
+      } else {
+        closeAllTeamPopovers();
+      }
+    });
+  }
+}
+
 /* ========================================================================== *
  * Sticky/formatting helpers
  * ========================================================================== */
@@ -495,6 +565,7 @@ function initAfterRender() {
 
   bindChipDelegationOnce();
   attachChipHandlers();
+  bindTeamPopoverDelegationOnce();
 
   requestAnimationFrame(() => {
     decorateDayHeaders();
