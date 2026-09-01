@@ -181,8 +181,9 @@
 
   {% block scripts %}
   <!-- Toast stack -->
-  
-    <div id="toast-wrap" class="fixed top-4 right-4 z-50 space-y-2"></div>
+  <div id="toast-wrap"
+       class="fixed left-1/2 -translate-x-1/2 z-50 flex flex-col items-stretch gap-2 w-[calc(100%-2rem)] max-w-sm"
+       style="top: calc(var(--h-nav, 0px) + var(--h-picks, 0px) + var(--h-billing, 0px) + 12px);"></div>
 
   <script>
     (function () {
@@ -1056,21 +1057,30 @@
         window.pbTestRefresh = () => { log('manual pbTestRefresh'); return window.refreshPicksBanner(); };
       })();
 
-    // Toasts (palette-aware)
+    // Toasts (palette-aware, matches the chip/score-badge status styling used
+    // site-wide: soft tinted fill + colored border, rather than a solid fill).
     window.renderToasts = (flashes) => {
       if (!flashes || !flashes.length) return;
       const wrap = document.getElementById("toast-wrap");
-      flashes.forEach(([cat, msg]) => {
+      // auth_* categories come from the login/register/reset-password flows
+      // and carry the same success/error meaning as everywhere else.
+      const normalizeCat = (cat) => {
+        if (cat === "auth_success") return "success";
+        if (cat === "auth_error") return "error";
+        return cat;
+      };
+      flashes.forEach(([rawCat, msg]) => {
+        const cat = normalizeCat(rawCat);
         const el = document.createElement("div");
         const classes =
-          cat === "success" ? "bg-success text-success-content" :
-            cat === "warning" ? "bg-warning text-warning-content" :
-              cat === "error" ? "bg-error text-error-content" :
-                "bg-foreground text-copy";
-        el.className = `flex items-start gap-2 px-4 py-2 rounded-lg text-sm shadow-lg ${classes} transition-opacity duration-200`;
+          cat === "success" ? "bg-success/30 border-success" :
+            cat === "warning" ? "bg-warning/30 border-warning" :
+              cat === "error" ? "bg-error/30 border-error" :
+                "bg-foreground border-border";
+        el.className = `flex items-start gap-2 px-4 py-2.5 rounded-lg border text-sm text-copy shadow-lg ${classes} transition-opacity duration-200`;
         el.innerHTML = `
           <span class="leading-5">${msg}</span>
-          <button class="ml-2 text-lg leading-none opacity-80 hover:opacity-100" aria-label="Close">&times;</button>
+          <button class="ml-auto text-lg leading-none opacity-70 hover:opacity-100" aria-label="Close">&times;</button>
         `;
         wrap.appendChild(el);
         const close = () => { el.style.opacity = 0; setTimeout(() => el.remove(), 200); };
