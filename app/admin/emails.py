@@ -61,6 +61,10 @@ def build_weekly_spreads_context(week: int,
         "timezone_name": "MDT",              # display label only (what you want to print)
         "tzname": "America/Denver",          # IANA tz for fmt_local()
     }
+    ctx["subject"] = (
+        f"Week {week} Spreads" if week <= 1
+        else f"Week {week - 1} Results / Week {week} Spreads"
+    )
     return ctx
 
 @bp.get("/email/previews")
@@ -134,7 +138,7 @@ def send_weekly_spreads_email():
 
     try:
         send_email(
-            subject=f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads",
+            subject=ctx["subject"],
             recipients=to,
             html=html_body,
             text=text_body,
@@ -166,7 +170,7 @@ def send_weekly_spreads_bulk():
 
     # Build the email once; reuse bodies per recipient
     ctx = build_weekly_spreads_context(week, locked=True)
-    subject = f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads"
+    subject = ctx["subject"]
     html_body = render_template("email/weekly_spreads.html", **ctx)
     try:
         text_body = render_template("email/weekly_spreads.txt", **ctx)
@@ -199,7 +203,7 @@ def send_weekly_spreads_bulk():
 def _send_weekly_to_subscribers(week: int, log_row: WeeklyEmailLog) -> tuple[int, int, list[str]]:
     # Build the email bodies once
     ctx = build_weekly_spreads_context(week, locked=True)
-    subject = f"Week {ctx['week_number'] - 1} Results / Week {ctx['week_number']} Spreads"
+    subject = ctx["subject"]
     html_body = render_template("email/weekly_spreads.html", **ctx)
     try:
         text_body = render_template("email/weekly_spreads.txt", **ctx)
