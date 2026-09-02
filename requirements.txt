@@ -26,9 +26,7 @@ pillow==11.3.0
 psycopg2-binary==2.9.10
 pycparser==2.22
 python-dotenv==1.1.1
-python-http-client==3.3.7
 requests==2.32.4
-sendgrid==6.12.4
 six==1.17.0
 SQLAlchemy==2.0.41
 tinycss2==1.4.0

@@ -1,11 +1,13 @@
 # app/emailer.py
 import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import requests
 from flask import current_app, render_template
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
+
+BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 def send_email(subject, recipients, text=None, html=None, sender=None) -> bool:
     """Raises on failure (bad API key, over quota, unverified sender, etc.)
@@ -14,27 +16,36 @@ def send_email(subject, recipients, text=None, html=None, sender=None) -> bool:
     message because this used to swallow the exception here."""
     if isinstance(recipients, str):
         recipients = [recipients]
-    message = Mail(
-        from_email=sender or MAIL_DEFAULT_SENDER,
-        to_emails=recipients,
-        subject=subject,
-        plain_text_content=text or "(no text content)",
-        html_content=html
-    )
+
+    payload = {
+        "sender": {"email": sender or MAIL_DEFAULT_SENDER},
+        "to": [{"email": r} for r in recipients],
+        "subject": subject,
+        "htmlContent": html or f"<pre>{text or '(no content)'}</pre>",
+    }
+    if text:
+        payload["textContent"] = text
+
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        resp = sg.send(message)
+        resp = requests.post(
+            BREVO_SEND_URL,
+            json=payload,
+            headers={
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY or "",
+                "content-type": "application/json",
+            },
+            timeout=15,
+        )
     except Exception as e:
         try:
-            current_app.logger.exception("SendGrid error: %s", e)
+            current_app.logger.exception("Brevo error: %s", e)
         except Exception:
-            print("SendGrid error:", e)
+            print("Brevo error:", e)
         raise
 
-    if resp.status_code != 202:
-        body = getattr(resp, "body", b"")
-        body = body.decode("utf-8", "replace") if isinstance(body, bytes) else body
-        err = f"SendGrid returned {resp.status_code}: {body}"
+    if resp.status_code not in (200, 201):
+        err = f"Brevo returned {resp.status_code}: {resp.text}"
         try:
             current_app.logger.error(err)
         except Exception:
