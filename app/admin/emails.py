@@ -42,7 +42,9 @@ def build_weekly_spreads_context(week: int,
     groups = _group_games_for_email(games)
 
     prev_week = max(1, week - 1)
-    standings_rows = _build_standings_rows_for_email(prev_week)
+    # No prior week to recap for the Week 1 email - skip the standings block
+    # entirely instead of showing an all-zeros table.
+    standings_rows = _build_standings_rows_for_email(prev_week) if week > 1 else []
 
     ctx = {
         "groups": groups,
