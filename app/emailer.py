@@ -1,5 +1,6 @@
 # app/emailer.py
 import os
+from email.utils import parseaddr
 import requests
 from flask import current_app, render_template
 
@@ -17,8 +18,15 @@ def send_email(subject, recipients, text=None, html=None, sender=None) -> bool:
     if isinstance(recipients, str):
         recipients = [recipients]
 
+    # MAIL_DEFAULT_SENDER is "Display Name <email>" (RFC 5322), which the old
+    # SendGrid SDK parsed itself - Brevo wants name/email as separate fields.
+    sender_name, sender_email = parseaddr(sender or MAIL_DEFAULT_SENDER or "")
+    sender_obj = {"email": sender_email}
+    if sender_name:
+        sender_obj["name"] = sender_name
+
     payload = {
-        "sender": {"email": sender or MAIL_DEFAULT_SENDER},
+        "sender": sender_obj,
         "to": [{"email": r} for r in recipients],
         "subject": subject,
         "htmlContent": html or f"<pre>{text or '(no content)'}</pre>",
