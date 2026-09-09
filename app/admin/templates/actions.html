@@ -31,10 +31,10 @@
         <form
           action="{{ url_for('admin.send_weekly_spreads_bulk', week=selected_week) }}"
           method="post"
-          onsubmit="return confirm('Send Week {{ selected_week }} email to {{ recap_count }} subscribers?');"
+          data-confirm="Send Week {{ selected_week }} email to {{ recap_count }} subscribers?"
         >
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Sends the Week {{ selected_week }} email via SendGrid to {{ recap_count }} subscribers."
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Sends the Week {{ selected_week }} email via Brevo to {{ recap_count }} subscribers."
                   {% if recap_count == 0 %}disabled{% endif %}>
             Send weekly email to {{ recap_count }} subscribers
           </button>
@@ -43,8 +43,8 @@
         <!-- Picks reminder (manual) -->
         <form method="post"
               action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
-              onsubmit="return confirm('Send reminder for Week {{ selected_week }} to {{ reminder_count }} users?');">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              data-confirm="Send reminder for Week {{ selected_week }} to {{ reminder_count }} users?">
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
                   {% if reminder_count==0 %}disabled{% endif %}>
             Send pick reminder to {{ reminder_count }}
           </button>
@@ -53,9 +53,9 @@
         <!-- Picks reminder (re-send) -->
         <form method="post"
               action="{{ url_for('admin.send_picks_reminder_manual', week=selected_week) }}"
-              onsubmit="return confirm('Re-send the picks reminder for Week {{ selected_week }}?');">
+              data-confirm="Re-send the picks reminder for Week {{ selected_week }}?">
           <input type="hidden" name="resend" value="1">
-          <button class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40">
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40">
             Re-send picks reminder
           </button>
         </form>
@@ -69,7 +69,7 @@
         <!-- Post-week finalize (unchanged) -->
         <form method="post" action="{{ url_for('admin.admin_scores_and_finalize_week', week=selected_week) }}">
           <button
-            class="px-4 py-2 rounded-lg bg-warning text-warning-content border border-border hover:opacity-90 hover:ring-2 hover:ring-primary/40"
+            class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40"
             title="Imports recent scores, then finalizes ATS for completed games in Week {{ selected_week }}."
           >
             Update Scores + Finalize ATS (Week {{ selected_week }})
@@ -79,7 +79,7 @@
         <!-- Tuesday 11:30 combo: refresh unlocked spreads, then lock+snapshot selected week -->
         <form method="post" action="{{ url_for('admin.admin_tuesday_lock_cycle', week=selected_week) }}">
           <button
-            class="px-4 py-2 rounded-lg bg-primary text-primary-content border border-border hover:bg-primary-dark"
+            class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40"
             title="Refresh spreads (UNLOCKED only), then lock & snapshot Week {{ selected_week }}."
           >
             Tuesday Cycle: Refresh → Lock & Snapshot (Week {{ selected_week }})
@@ -93,26 +93,26 @@
       <h2 class="text-lg font-semibold mb-3">Data Imports</h2>
       <div class="flex flex-wrap gap-2">
         <form method="post" action="{{ url_for('admin.admin_import_lines', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40">
             Import Lines (Regular Season)
           </button>
         </form>
 
         <form method="post" action="{{ url_for('admin.admin_import_scores', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40">
             Import Scores (last 3 days)
           </button>
         </form>
 
         <form method="post" action="{{ url_for('admin.admin_refresh_spreads', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border">
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40">
             Refresh Spreads (Unlocked Only)
           </button>
         </form>
 
         <!-- Moved here -->
         <form method="post" action="{{ url_for('admin.admin_lock_weeks', week=selected_week) }}">
-          <button class="px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary-dark border border-border"
+          <button class="px-4 py-2 rounded-lg border border-border bg-background text-copy hover:ring-2 hover:ring-primary/40"
                   title="Locks all weeks up to the current NFL week and snapshots closing lines for newly locked games.">
             Lock Weeks Through Current
           </button>

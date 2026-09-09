@@ -61,7 +61,7 @@
           <td class="py-2">
             {% if not s.is_active %}
             <form method="post" action="{{ url_for('admin.make_season_active', season_id=s.id) }}"
-                  onsubmit="return confirm('Make {{ s.year }} the active season? This affects the live site immediately.');">
+                  data-confirm="Make {{ s.year }} the active season? This affects the live site immediately.">
               <button class="text-xs px-2 py-1 rounded border border-border hover:opacity-90">Make active</button>
             </form>
             {% endif %}
@@ -75,7 +75,7 @@
   <div class="rounded-xl border border-border bg-foreground p-4">
     <h2 class="text-lg font-semibold mb-3">Start a new season</h2>
     <form method="post" action="{{ url_for('admin.create_season') }}"
-          onsubmit="return confirm('Create this season and make it active? This immediately switches the live site to it.');"
+          data-confirm="Create this season and make it active? This immediately switches the live site to it."
           class="flex flex-wrap items-end gap-3">
       <label class="flex flex-col gap-1">
         <span class="text-copy-light text-sm">Year</span>
