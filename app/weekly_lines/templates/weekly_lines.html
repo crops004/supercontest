@@ -122,7 +122,13 @@ const userTZ = (typeof detectedTZ === 'string' && detectedTZ.length) ? detectedT
 
 /* ---------- Local “dirty” state & cache ---------- */
 let dirty = false;
+let baselineSelections = new Set();
 function storageKey(week) { return `pendingPicks:${week}`; }
+function selectionsEqualToBaseline() {
+  const current = collectSelectionsFromUI();
+  if (current.length !== baselineSelections.size) return false;
+  return current.every(id => baselineSelections.has(id));
+}
 
 /* ---------- Expose selected week globally for /api/picks/status ---------- */
 window.selectedWeek = window.selectedWeek || parseInt(weekControls?.dataset?.selectedWeek || weekEl?.value || '0', 10) || 0;
@@ -243,7 +249,7 @@ function tryToggleChip(chip) {
 
   if (wasPressed) {
     setChipPressed(chip, false);
-    setDirty(true);
+    setDirty(!selectionsEqualToBaseline());
     syncFallbackHiddenInputs();
     cacheSelections();
     return;
@@ -265,7 +271,7 @@ function tryToggleChip(chip) {
   }
 
   setChipPressed(chip, true);
-  setDirty(true);
+  setDirty(!selectionsEqualToBaseline());
   syncFallbackHiddenInputs();
   cacheSelections();
 }
@@ -431,6 +437,10 @@ async function loadWeek(w) {
     // Normalize after each fragment load
     attachChipHandlers();
 
+    // Snapshot of what's actually saved server-side, before any local
+    // draft gets restored on top - the "nothing to submit" baseline.
+    baselineSelections = new Set(collectSelectionsFromUI());
+
     requestAnimationFrame(() => {
       decorateDayHeaders();
       applyStickyOffsets();
@@ -536,6 +546,9 @@ floatBtn?.addEventListener('click', async () => {
 
     renderFooterPicks(data.committed_picks || []);
     statusEl.textContent = `Saved ${data.saved} pick${data.saved === 1 ? '' : 's'}.`;
+    // Re-sync the baseline to what actually got saved, so toggling back to
+    // this state afterward correctly reads as "nothing to submit" again.
+    baselineSelections = new Set((data.committed_picks || []).map(p => `${p.game_id}::${p.team}`));
     setDirty(false);
     floatBtn.disabled = false;
     clearCacheForWeek(wk);
@@ -570,6 +583,10 @@ function initAfterRender() {
   bindChipDelegationOnce();
   attachChipHandlers();
   bindTeamPopoverDelegationOnce();
+
+  // Snapshot of what's actually saved server-side, before any local
+  // draft gets restored on top - the "nothing to submit" baseline.
+  baselineSelections = new Set(collectSelectionsFromUI());
 
   requestAnimationFrame(() => {
     decorateDayHeaders();
