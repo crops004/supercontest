@@ -110,7 +110,8 @@ def season_roster(season_id):
         us.user_id: us
         for us in UserSeason.query.filter_by(season_id=season.id).all()
     }
-    users = User.query.order_by(User.username.asc()).all()
+    users = User.query.all()
+    users.sort(key=lambda u: (u.first_name or u.username or "").casefold())
     rows = [
         {"user": u, "user_season": user_seasons[u.id]}
         for u in users if u.id in user_seasons
