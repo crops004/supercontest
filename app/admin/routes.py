@@ -239,9 +239,11 @@ def admin_tuesday_lock_cycle():
 def cron_tuesday_lock_cycle():
     """
     Refresh spreads for UNLOCKED games, then lock & snapshot a target week.
-    Self-gated to local Tue 11:00 (the ~11:30 AM MDT slot) unless force=1, so
-    it's safe to ping on any schedule (e.g. hourly) without re-snapshotting
-    the "closing" lines more than once a week.
+    Self-gated to local Tue 6am-noon unless force=1 - a window rather than an
+    exact hour because GitHub Actions' schedule trigger is best-effort and
+    can be delayed by a few hours. Safe to ping on any schedule (e.g.
+    hourly) without re-snapshotting the "closing" lines more than once a
+    week, since re-running against already-locked games is a no-op.
 
     Query params:
       - week: int (default = current_week_number())
@@ -254,8 +256,8 @@ def cron_tuesday_lock_cycle():
 
     force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    if not force and (now_local.weekday() != 1 or now_local.hour != 11):
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 11:00"}), 200
+    if not force and (now_local.weekday() != 1 or not (6 <= now_local.hour < 12)):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue morning"}), 200
 
     week = request.args.get("week", type=int) or current_week_number()
     dry_run = str(request.args.get("dry_run", "")).strip().lower() in ("1","true","yes","y","on")
@@ -317,14 +319,15 @@ def _finalize_week_ats(week: int, *, days_from: int = 3) -> dict:
     }
 
 
-# --- CRON: finalize last week's ATS at Tue 00:00 local -------------------------
+# --- CRON: finalize last week's ATS early Tuesday local ------------------------
 
 @bp.post("/internal/cron/finalize-ats")
 def cron_finalize_ats():
     """
     Finalize ATS for a target week. Defaults to LAST week
-    (current_week_number() - 1). Self-gated to local Tue 00:00 unless
-    force=1, so it's safe to ping on any schedule (e.g. hourly).
+    (current_week_number() - 1). Self-gated to local Tue midnight-6am unless
+    force=1 - a window rather than an exact hour because GitHub Actions'
+    schedule trigger is best-effort and can be delayed by a few hours.
 
     Query params:
       - week: int (override target week; default = current_week_number()-1)
@@ -338,8 +341,8 @@ def cron_finalize_ats():
 
     force = str(request.args.get("force", "")).strip().lower() in ("1", "true", "yes", "y", "on")
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    if not force and (now_local.weekday() != 1 or now_local.hour != 0):
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 00:00"}), 200
+    if not force and (now_local.weekday() != 1 or not (0 <= now_local.hour < 6)):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue early morning"}), 200
 
     cur = current_week_number()
     default_week = max(1, (cur or 1) - 1)
@@ -435,7 +438,10 @@ def _in_score_refresh_window(now_local: datetime) -> bool:
         if kickoff_local.date() != today:
             continue
         hours_since = (now_local - kickoff_local).total_seconds() / 3600
-        if 2.0 <= hours_since <= 4.0:
+        # Widened from a 2-hour band - GitHub Actions' schedule trigger can
+        # be delayed by a few hours, so a narrower window risked being
+        # skipped entirely between runs.
+        if 1.5 <= hours_since <= 5.0:
             return True
     return False
 

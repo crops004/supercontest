@@ -18,6 +18,7 @@ from app.filters import team_short
 from app.emailer import send_email
 from app.services.week import current_week_number
 from app.services.season import current_season_id
+from app.services.games_sync import refresh_spreads_unlocked
 from app.services.time_utils import day_key, time_key
 from app.services.picks import remaining_picks_this_week
 
@@ -275,8 +276,16 @@ def cron_weekly_email():
     resend = str(request.args.get("resend","")).strip().lower() in ("1", "true", "yes", "y", "on")
 
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    if not force and (now_local.weekday() != 1 or now_local.hour != 12):
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue 12:00"}), 200
+    if not force and (now_local.weekday() != 1 or not (12 <= now_local.hour < 20)):
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Tue afternoon"}), 200
+
+    # Self-sufficient regardless of whether tuesday-lock-cycle has already
+    # run today (GitHub Actions' scheduler isn't precise enough to guarantee
+    # ordering between the two) - make sure this week's lines actually exist.
+    try:
+        refresh_spreads_unlocked()
+    except Exception:
+        current_app.logger.exception("[cron_weekly_email] pre-send line refresh failed")
 
     subject = f"Week {week} NFL Spreads"
     season_id = current_season_id()
@@ -741,8 +750,8 @@ def cron_picks_reminder():
     force = str(request.args.get("force","")).lower() in ("1","true","yes","y","on")
 
     now_local = datetime.now(ZoneInfo("America/Denver"))
-    if not force and not (now_local.weekday() == 6 and now_local.hour == 10):  # Sunday=6
-        return jsonify({"ok": True, "skipped": True, "reason": "not local Sun 10:00"}), 200
+    if not force and not (now_local.weekday() == 6 and 9 <= now_local.hour < 15):  # Sunday=6
+        return jsonify({"ok": True, "skipped": True, "reason": "not local Sun morning"}), 200
 
     try:
         lock = WeeklyEmailLog()
