@@ -438,10 +438,11 @@ def _in_score_refresh_window(now_local: datetime) -> bool:
         if kickoff_local.date() != today:
             continue
         hours_since = (now_local - kickoff_local).total_seconds() / 3600
-        # Widened from a 2-hour band - GitHub Actions' schedule trigger can
-        # be delayed by a few hours, so a narrower window risked being
-        # skipped entirely between runs.
-        if 1.5 <= hours_since <= 5.0:
+        # Widened again after a real miss: two runs landed at +1h04m and
+        # +5h13m post-kickoff, straddling clean over the old 1.5-5.0 window.
+        # This is a backstop now, not the primary defense - see the
+        # external cron-job.org pings for the actual reliable trigger.
+        if 1.0 <= hours_since <= 6.0:
             return True
     return False
 
