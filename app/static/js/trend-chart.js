@@ -74,17 +74,22 @@
   function buildDatasets(mode, range) {
     const startIdx = weekStartIndex(range);
     const picked = seriesForMode(mode);
-    return picked.map((s, i) => ({
-      userId: s.user_id,
-      label: s.display_name,
-      data: s.cumulative.slice(startIdx),
-      borderColor: mode === 'all'
-        ? (s.user_id === currentUserId ? HIGHLIGHT : MUTED)
-        : PALETTE[i % PALETTE.length],
-      borderWidth: mode === 'all' ? (s.user_id === currentUserId ? 2.5 : 1.5) : 2.5,
-      pointRadius: 0,
-      tension: 0.15,
-    }));
+    return picked.map((s, i) => {
+      const data = s.cumulative.slice(startIdx);
+      return {
+        userId: s.user_id,
+        label: s.display_name,
+        data,
+        borderColor: mode === 'all'
+          ? (s.user_id === currentUserId ? HIGHLIGHT : MUTED)
+          : PALETTE[i % PALETTE.length],
+        borderWidth: mode === 'all' ? (s.user_id === currentUserId ? 2.5 : 1.5) : 2.5,
+        // A single visible week has no line to draw, and pointRadius 0 hides
+        // the point too - show a small dot so week 1 isn't just blank.
+        pointRadius: data.length > 1 ? 0 : 3,
+        tension: 0.15,
+      };
+    });
   }
 
   function labelsForRange(range) {
