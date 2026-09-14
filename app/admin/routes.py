@@ -575,13 +575,13 @@ def picks_matrix():
         status = "pending" if pts is None else ("win" if pts == 1.0 else "push" if pts == 0.5 else "loss")
         slot = by_user[u.id]
         slot["user_id"] = u.id
-        slot["username"] = u.username
+        slot["username"] = u.display_full_name
         slot["picks"].append({"team": p.chosen_team, "status": status})
 
     all_users = User.query.order_by(User.username.asc()).all()
     matrix: List[Dict] = []
     for u in all_users:
-        rec = by_user.get(u.id) or {"user_id": u.id, "username": u.username, "picks": []}
+        rec = by_user.get(u.id) or {"user_id": u.id, "username": u.display_full_name, "picks": []}
         picks_list = list(rec.get("picks", []))[:5]
         while len(picks_list) < 5:
             picks_list.append({"team": "", "status": "empty"})
@@ -589,7 +589,7 @@ def picks_matrix():
         rec["pick_count"] = sum(1 for pk in picks_list if pk["team"])
         matrix.append(rec)
 
-    matrix.sort(key=lambda r: (-r["pick_count"], r["username"].lower()))
+    matrix.sort(key=lambda r: r["username"].lower())
 
     return render_template("picks.html", weeks=weeks, selected_week=selected_week, matrix=matrix)
 
