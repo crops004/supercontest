@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Matchup Breakdown{% endblock %}
+
+{% block content %}
+<div class="admin-page mx-auto max-w-[700px] p-6 text-copy">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">Matchup Breakdown</h1>
+    <a href="{{ url_for('admin.index', week=selected_week) }}" class="text-sm hover:underline">← Back to Admin Hub</a>
+  </div>
+
+  <form method="get" class="mb-4 flex items-center gap-2">
+    <label class="flex items-center gap-2">
+      <span class="text-copy-light">Week:</span>
+      <select name="week" class="border border-border rounded px-2 py-1 bg-foreground text-copy">
+        {% for w in weeks %}
+          <option value="{{ w }}" {{ 'selected' if w == selected_week else '' }}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Go</button>
+  </form>
+
+  <div class="space-y-3">
+    {% for m in matchups %}
+    <div class="rounded-xl border border-border bg-foreground p-3">
+      <div class="text-xs text-copy-lighter mb-2">
+        {{ m.kickoff_at | fmt_local('America/Denver', 'time') if m.kickoff_at else '' }}
+      </div>
+      <table class="w-full text-sm">
+        <tr>
+          <td class="py-1">{{ m.away_team | abbr_team }}</td>
+          <td class="py-1 text-center w-16">{{ m.spread_away | fmt_spread if m.spread_away is not none else '—' }}</td>
+          <td class="py-1 text-center w-16 font-semibold {{ 'text-success' if m.away_cover_pct and m.away_cover_pct >= 55 else ('text-error' if m.away_cover_pct and m.away_cover_pct <= 45 else '') }}">
+            {{ '%.0f%%' % m.away_cover_pct if m.away_cover_pct is not none else '—' }}
+          </td>
+          <td class="py-1 text-center w-20 text-copy-lighter">{{ m.away_picked }} picked</td>
+        </tr>
+        <tr>
+          <td class="py-1">{{ m.home_team | abbr_team }}</td>
+          <td class="py-1 text-center w-16">{{ m.spread_home | fmt_spread if m.spread_home is not none else '—' }}</td>
+          <td class="py-1 text-center w-16 font-semibold {{ 'text-success' if m.home_cover_pct and m.home_cover_pct >= 55 else ('text-error' if m.home_cover_pct and m.home_cover_pct <= 45 else '') }}">
+            {{ '%.0f%%' % m.home_cover_pct if m.home_cover_pct is not none else '—' }}
+          </td>
+          <td class="py-1 text-center w-20 text-copy-lighter">{{ m.home_picked }} picked</td>
+        </tr>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-copy-light">No games for this week.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

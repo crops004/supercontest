@@ -28,31 +28,67 @@
     <button class="px-3 py-1 rounded border border-border bg-background hover:opacity-90 text-sm">Update</button>
   </form>
 
+  <p class="text-xs text-copy-lighter mb-3">
+    Cover %/Picked/Won/Lost/Tied/Win %/Diff follow the toggle above. The week-by-week grid always shows the full season.
+    Diff = that team's picks' Win % minus the team's own Cover % - positive means the crowd's picks on that team are
+    outperforming the team's actual cover rate; negative means the crowd is picking it more than its performance justifies.
+  </p>
+
   <div class="overflow-x-auto rounded-xl border border-border bg-foreground">
-    <table class="min-w-full text-sm">
+    <table class="text-sm">
       <thead class="bg-background text-copy-light">
         <tr>
-          <th class="px-3 py-2 text-left font-semibold">Team</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Team</th>
           <th class="px-3 py-2 text-center font-semibold">Covers</th>
-          <th class="px-3 py-2 text-center font-semibold">Pushes</th>
-          <th class="px-3 py-2 text-center font-semibold">No-Covers</th>
-          <th class="px-3 py-2 text-center font-semibold">Record</th>
+          <th class="px-3 py-2 text-center font-semibold">No Cov</th>
+          <th class="px-3 py-2 text-center font-semibold">Push</th>
           <th class="px-3 py-2 text-center font-semibold">Cover %</th>
+          <th class="px-3 py-2 text-center font-semibold">Picked</th>
+          <th class="px-3 py-2 text-center font-semibold">Won</th>
+          <th class="px-3 py-2 text-center font-semibold">Lost</th>
+          <th class="px-3 py-2 text-center font-semibold">Tied</th>
+          <th class="px-3 py-2 text-center font-semibold">Win %</th>
+          <th class="px-3 py-2 text-center font-semibold">Diff</th>
+          {% for w in all_weeks %}
+            <th class="px-1.5 py-2 text-center font-semibold text-[11px]">{{ w }}</th>
+          {% endfor %}
         </tr>
       </thead>
       <tbody class="divide-y divide-border">
         {% for row in ats_summary %}
         <tr class="hover:bg-background/60">
-          <td class="px-3 py-2">{{ row.team }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ row.team }}</td>
           <td class="px-3 py-2 text-center">{{ row.covers }}</td>
-          <td class="px-3 py-2 text-center">{{ row.pushes }}</td>
           <td class="px-3 py-2 text-center">{{ row.nocovers }}</td>
-          <td class="px-3 py-2 text-center">{{ row.record }}</td>
-          <td class="px-3 py-2 text-center">{{ '%.1f%%' % row.pct }}</td>
+          <td class="px-3 py-2 text-center">{{ row.pushes }}</td>
+          <td class="px-3 py-2 text-center font-semibold">{{ '%.0f%%' % row.pct }}</td>
+          <td class="px-3 py-2 text-center">{{ row.picked }}</td>
+          <td class="px-3 py-2 text-center">{{ row.won }}</td>
+          <td class="px-3 py-2 text-center">{{ row.lost }}</td>
+          <td class="px-3 py-2 text-center">{{ row.tied }}</td>
+          <td class="px-3 py-2 text-center">
+            {{ '%.0f%%' % row.win_pct if row.win_pct is not none else '—' }}
+          </td>
+          <td class="px-3 py-2 text-center font-semibold {{ 'text-success' if row.diff and row.diff > 0 else ('text-error' if row.diff and row.diff < 0 else '') }}">
+            {{ '%+.0f%%' % row.diff if row.diff is not none else '—' }}
+          </td>
+          {% for cell in row.weekly %}
+            {% if cell.status == 'COVER' %}
+              <td class="px-1 py-2 text-center bg-success/30" title="Week {{ cell.week }}: covered"></td>
+            {% elif cell.status == 'NO_COVER' %}
+              <td class="px-1 py-2 text-center bg-error/30" title="Week {{ cell.week }}: no cover"></td>
+            {% elif cell.status == 'PUSH' %}
+              <td class="px-1 py-2 text-center bg-warning/30" title="Week {{ cell.week }}: push"></td>
+            {% elif cell.status == 'PENDING' %}
+              <td class="px-1 py-2 text-center text-copy-lighter" title="Week {{ cell.week }}: not graded yet">·</td>
+            {% else %}
+              <td class="px-1 py-2 text-center text-copy-lighter" title="Week {{ cell.week }}: bye"></td>
+            {% endif %}
+          {% endfor %}
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="px-3 py-3 text-copy-light">No ATS data.</td>
+          <td colspan="{{ 11 + all_weeks|length }}" class="px-3 py-3 text-copy-light">No ATS data.</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -22,7 +22,13 @@
     <a href="{{ url_for('admin.ats_summary', week=selected_week) }}"
        class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
       <div class="text-lg font-semibold mb-1">ATS Summary</div>
-      <p class="text-sm text-copy-lighter">Covers / Pushes / No-covers by team.</p>
+      <p class="text-sm text-copy-lighter">Cover/pick stats by team, plus a week-by-week hot/cold grid.</p>
+    </a>
+
+    <a href="{{ url_for('admin.matchup_breakdown', week=selected_week) }}"
+       class="block rounded-2xl border border-border bg-foreground p-5 hover:ring-2 hover:ring-primary/40">
+      <div class="text-lg font-semibold mb-1">Matchup Breakdown</div>
+      <p class="text-sm text-copy-lighter">This week's games: cover % and pick counts side by side.</p>
     </a>
 
     <a href="{{ url_for('admin.db_home') }}"

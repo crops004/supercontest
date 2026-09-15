@@ -6,7 +6,7 @@ from flask_login import login_required
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from collections import defaultdict, OrderedDict
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from app.extensions import db
 from app.models import Game, Pick, User, TeamGameATS
@@ -517,10 +517,55 @@ def ats_summary():
     q = q.group_by(TeamGameATS.team).order_by(TeamGameATS.team.asc())
     ats_rows = q.all()
 
+    # How each user's picks on a team actually did, same scope as above -
+    # only picks on games that have been graded (ats_result is set).
+    pick_q = (
+        db.session.query(Pick.chosen_team.label("team"), TeamGameATS.ats_result.label("ats_result"))
+        .join(Game, Pick.game_id == Game.id)
+        .join(
+            TeamGameATS,
+            db.and_(TeamGameATS.game_id == Pick.game_id, TeamGameATS.team == Pick.chosen_team),
+        )
+        .filter(Game.season_id == current_season_id(), TeamGameATS.ats_result.isnot(None))
+    )
+    if ats_scope == "week":
+        pick_q = pick_q.filter(Game.week == selected_week)
+    else:
+        pick_q = pick_q.filter(Game.week != None, Game.week <= selected_week)
+
+    pick_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"picked": 0, "won": 0, "lost": 0, "tied": 0})
+    for team, result in pick_q.all():
+        s = pick_stats[team]
+        s["picked"] += 1
+        if result == "COVER":
+            s["won"] += 1
+        elif result == "NO_COVER":
+            s["lost"] += 1
+        elif result == "PUSH":
+            s["tied"] += 1
+
+    # Week-by-week cover/no-cover/push/bye grid, always the full season
+    # regardless of the season-vs-week toggle above.
+    grid_rows = (
+        db.session.query(TeamGameATS.team, Game.week, TeamGameATS.ats_result)
+        .join(Game, TeamGameATS.game_id == Game.id)
+        .filter(Game.season_id == current_season_id())
+        .all()
+    )
+    grid: Dict[str, Dict[int, str]] = defaultdict(dict)
+    for team, wk, result in grid_rows:
+        grid[team][wk] = result or "PENDING"
+    all_weeks = list(range(1, max(weeks) + 1)) if weeks and max(weeks) > 0 else []
+
     ats_summary = []
     for r in ats_rows:
         total = (r.covers or 0) + (r.pushes or 0) + (r.nocovers or 0)
         pct = (float(r.covers) / total * 100.0) if total else 0.0
+        ps = pick_stats.get(r.team, {"picked": 0, "won": 0, "lost": 0, "tied": 0})
+        picked = ps["picked"]
+        win_pct = ((ps["won"] + ps["tied"] * 0.5) / picked * 100.0) if picked else None
+        diff = (win_pct - pct) if win_pct is not None else None
+        team_weeks = grid.get(r.team, {})
         ats_summary.append({
             "team": r.team,
             "covers": int(r.covers or 0),
@@ -529,7 +574,16 @@ def ats_summary():
             "total": total,
             "pct": pct,
             "record": f"{int(r.covers or 0)}-{int(r.nocovers or 0)}-{int(r.pushes or 0)}",
+            "picked": picked,
+            "won": ps["won"],
+            "lost": ps["lost"],
+            "tied": ps["tied"],
+            "win_pct": win_pct,
+            "diff": diff,
+            "weekly": [{"week": w, "status": team_weeks.get(w, "BYE")} for w in all_weeks],
         })
+
+    ats_summary.sort(key=lambda r: -r["pct"])
 
     return render_template(
         "ats.html",
@@ -537,6 +591,83 @@ def ats_summary():
         selected_week=selected_week,
         ats_scope=ats_scope,
         ats_summary=ats_summary,
+        all_weeks=all_weeks,
+    )
+
+
+# ------------------------------------------------------------
+# MATCHUP BREAKDOWN PAGE (game-by-game cover% + this week's pick counts)
+# ------------------------------------------------------------
+@bp.get("/matchup-breakdown")
+@login_required
+def matchup_breakdown():
+    season_id = current_season_id()
+
+    week_rows = (
+        db.session.query(Game.week)
+        .filter(Game.season_id == season_id)
+        .distinct()
+        .order_by(Game.week.asc())
+        .all()
+    )
+    weeks: List[int] = [w for (w,) in week_rows] or [0]
+    current_wk = current_week_number()
+    selected_week = request.args.get("week", type=int)
+    if selected_week is None:
+        selected_week = current_wk if current_wk in weeks else (weeks[-1] if weeks else 0)
+    elif selected_week not in weeks and weeks:
+        selected_week = weeks[-1]
+
+    # Each team's season-to-date cover % through the selected week.
+    covers = db.func.sum(db.case((TeamGameATS.ats_result == 'COVER', 1), else_=0))
+    pushes = db.func.sum(db.case((TeamGameATS.ats_result == 'PUSH', 1), else_=0))
+    nocovs = db.func.sum(db.case((TeamGameATS.ats_result == 'NO_COVER', 1), else_=0))
+    cover_rows = (
+        db.session.query(TeamGameATS.team, covers, pushes, nocovs)
+        .join(Game, TeamGameATS.game_id == Game.id)
+        .filter(Game.season_id == season_id, Game.week != None, Game.week <= selected_week)
+        .group_by(TeamGameATS.team)
+        .all()
+    )
+    cover_pct_by_team: Dict[str, float] = {}
+    for team, c, p, n in cover_rows:
+        total = (c or 0) + (p or 0) + (n or 0)
+        if total:
+            cover_pct_by_team[team] = float(c) / total * 100.0
+
+    # How many users have picked each team, for THIS week specifically.
+    pick_count_rows = (
+        db.session.query(Pick.game_id, Pick.chosen_team, db.func.count(Pick.id))
+        .join(Game, Pick.game_id == Game.id)
+        .filter(Game.week == selected_week, Game.season_id == season_id)
+        .group_by(Pick.game_id, Pick.chosen_team)
+        .all()
+    )
+    pick_counts: Dict[Tuple[int, str], int] = {(gid, team): cnt for gid, team, cnt in pick_count_rows}
+
+    games = (
+        Game.query.filter_by(week=selected_week, season_id=season_id)
+        .order_by(Game.kickoff_at.asc())
+        .all()
+    )
+    matchups = [{
+        "game_id": g.id,
+        "kickoff_at": g.kickoff_at,
+        "away_team": g.away_team,
+        "home_team": g.home_team,
+        "spread_away": g.spread_away,
+        "spread_home": g.spread_home,
+        "away_cover_pct": cover_pct_by_team.get(g.away_team),
+        "home_cover_pct": cover_pct_by_team.get(g.home_team),
+        "away_picked": pick_counts.get((g.id, g.away_team), 0),
+        "home_picked": pick_counts.get((g.id, g.home_team), 0),
+    } for g in games]
+
+    return render_template(
+        "matchup_breakdown.html",
+        weeks=weeks,
+        selected_week=selected_week,
+        matchups=matchups,
     )
 
 
