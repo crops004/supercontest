@@ -13,33 +13,13 @@ from app.scoring import points_for_pick
 from app.services.season import current_season_id, get_current_season
 from app.services.standings_trend import get_cumulative_points_trend, REGULAR_SEASON_WEEKS
 from app.services.roster import roster_user_ids
+from app.services.week import current_week_number
 from . import bp
 
 
 # --- helpers ---
 
 FALLBACK_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
-
-def get_current_week() -> int:
-    """
-    Current week = max week having at least one game with kickoff <= now(),
-    scoped to the current season. Falls back to earliest week in the season
-    if nothing has started yet.
-    """
-    season_id = current_season_id()
-    kicked = (
-        db.session.query(func.max(Game.week))
-        .filter(Game.season_id == season_id, Game.kickoff_at <= func.now())
-        .scalar()
-    )
-    if kicked is not None:
-        return int(kicked)
-    first_week = (
-        db.session.query(func.min(Game.week))
-        .filter(Game.season_id == season_id)
-        .scalar()
-    )
-    return int(first_week or 0)
 
 
 # --- routes ---
@@ -83,7 +63,7 @@ def standings():
     # --- determine display week / bounds ---
     season_id = current_season_id()
     season = get_current_season()
-    cur_week = get_current_week()
+    cur_week = current_week_number()
     min_week = db.session.query(func.min(Game.week)).filter(Game.season_id == season_id).scalar() or 0
     max_week = db.session.query(func.max(Game.week)).filter(Game.season_id == season_id).scalar() or 0
     # Week 19 (tiebreaker) only counts if explicitly enabled for this season.

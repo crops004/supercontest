@@ -31,7 +31,9 @@
         {% endif %}
       {% endif %}
     </div>
+    {% if display_week != current_week %}
     <div class="text-copy-lighter text-sm">Current week: {{ current_week }}</div>
+    {% endif %}
   </div>
 
   <!-- Standings trend chart -->
