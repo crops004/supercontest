@@ -1,10 +1,9 @@
 from flask import Blueprint, jsonify, current_app, make_response, url_for, request
 from flask_login import login_required, current_user
-from sqlalchemy import func
-from app.extensions import db
-from app.models import Game, UserSeason
+from app.models import UserSeason
 from app.services.picks import remaining_picks_this_week
 from app.services.season import current_season_id
+from app.services.week import current_week_number
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -53,18 +52,6 @@ def picks_status():
     )
     return resp
 
-def _current_contest_week() -> int | None:
-    """
-    Current week = max(Game.week) where kickoff <= now(), scoped to the
-    current season. Returns None if no games exist yet this season.
-    """
-    wk = (
-        db.session.query(func.max(Game.week))
-        .filter(Game.kickoff_at <= func.now(), Game.season_id == current_season_id())
-        .scalar()
-    )
-    return int(wk) if wk is not None else None
-
 @bp.get("/billing/status")
 @login_required
 def billing_status():
@@ -73,7 +60,11 @@ def billing_status():
         user_id=current_user.id, season_id=current_season_id()
     ).first()
     unpaid = not bool(user_season.entry_paid) if user_season else True
-    wk = _current_contest_week() or 1
+    # Same "current week" definition used everywhere else (date-based, not
+    # "has a game kicked off yet") - otherwise the banner can't grow until
+    # after that week's games start, which defeats the point of the
+    # escalating reminder ahead of the payment deadline.
+    wk = current_week_number()
 
     # height factor by week
     factor = 1 if wk <= 1 else 2 if wk == 2 else 3 if wk == 3 else 4
