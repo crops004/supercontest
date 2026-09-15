@@ -1,25 +1,15 @@
 name: Supercontest cron
 
-# Replaces Render's paid Scheduled Jobs. Every job below is self-gated in the
-# app (app/admin/routes.py / app/admin/emails.py) based on real local time
-# (weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats) or real
-# kickoff times already in the DB (refresh-scores), so it's safe to ping all
-# of them far more often than they actually need to run - each call is a
-# harmless no-op outside its real window. That also sidesteps GitHub Actions'
-# UTC-only cron and DST entirely, since the app does the local-time check.
-#
-# Manual runs (workflow_dispatch) are always a dry test, never a real send:
-#   - weekly-email / picks-reminder are never forced here - a plain call
-#     just proves the token/URL/routing work (a 200 "skipped" response),
-#     since force=1 on those would actually send real email to the list.
-#   - tuesday-lock-cycle / finalize-ats are forced WITH dry_run=1, so the
-#     real logic runs but nothing is written.
-#   - refresh-scores is forced directly - it only reads/writes score data,
-#     no external side effects, so this is safe as-is.
+# Score refresh only. weekly-email, picks-reminder, tuesday-lock-cycle, and
+# finalize-ats are triggered exclusively by precise cron-job.org pings now -
+# GitHub Actions' schedule trigger is best-effort and can be delayed by
+# hours, which is fine for "check scores often" but not for "lock lines at
+# exactly 11:30am" or "never send an email at a random time." Score refresh
+# is still self-gated in the app (kickoff time +/- a few hours), so pinging
+# it on any imprecise schedule is harmless - it no-ops outside its window.
 on:
   schedule:
-    - cron: '0 * * * *'     # hourly: weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats
-    - cron: '*/15 * * * *'  # every 15 min: refresh-scores
+    - cron: '*/15 * * * *'
   workflow_dispatch: {}
 
 permissions: {}
@@ -32,42 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Hourly jobs (weekly-email, picks-reminder, tuesday-lock-cycle, finalize-ats)
-        if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
-        run: |
-          set -u
-          MANUAL=""
-          [ "${{ github.event_name }}" = "workflow_dispatch" ] && MANUAL=1
-          FAIL=0
-
-          # Never forced - real send would happen if forced and not already sent today.
-          for path in weekly-email picks-reminder; do
-            echo "== $path =="
-            if ! curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
-                 "$BASE_URL/admin/internal/cron/$path"; then
-              echo "::error::$path failed"
-              FAIL=1
-            fi
-            echo
-          done
-
-          # Safe to force on a manual test: dry_run=1 means nothing is written.
-          for path in tuesday-lock-cycle finalize-ats; do
-            QUERY=""
-            [ -n "$MANUAL" ] && QUERY="?force=1&dry_run=1"
-            echo "== $path$QUERY =="
-            if ! curl -sf -X POST -H "X-CRON-TOKEN: ${{ secrets.CRON_SECRET }}" \
-                 "$BASE_URL/admin/internal/cron/$path$QUERY"; then
-              echo "::error::$path failed"
-              FAIL=1
-            fi
-            echo
-          done
-
-          exit $FAIL
-
       - name: Score refresh
-        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
         run: |
           set -u
           QUERY=""
