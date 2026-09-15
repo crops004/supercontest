@@ -662,6 +662,7 @@ def matchup_breakdown():
         "away_picked": pick_counts.get((g.id, g.away_team), 0),
         "home_picked": pick_counts.get((g.id, g.home_team), 0),
     } for g in games]
+    matchups.sort(key=lambda m: -(m["away_picked"] + m["home_picked"]))
 
     return render_template(
         "matchup_breakdown.html",
